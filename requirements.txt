@@ -1,0 +1,13 @@
+DAWG-Python==0.7.2
+Django==1.8.4
+django-appconf==1.0.1
+django-geoposition==0.2.2
+django-grappelli==2.7.1
+djangoajax==2.2.15
+docopt==0.6.2
+lxml==3.4.4
+pymorphy2==0.8
+pymorphy2-dicts==2.4.393442.3710985
+pympi-ling==1.40
+six==1.9.0
+wheel==0.24.0

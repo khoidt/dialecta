@@ -1,0 +1,473 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls admin_static admin_modify %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+	div#grp-content-container {
+		height: 100%;
+		position: relative;
+	}
+	.eaf_display {
+	    margin-top: -30px;
+		margin-bottom: -80px;
+	}
+	#workbench {
+		position: fixed;
+		top: 100px;
+		right: 0px;
+		-webkit-transition-duration: 0.3s;
+		-moz-transition-duration: 0.3s;
+		-o-transition-duration: 0.3s;
+		transition-duration: 0.3s;
+		
+		min-width: 470px;
+		min-height: 500px;
+		
+		padding-left: 10px;
+		padding-right: 20px;
+		
+		-moz-box-sizing: border-box;
+		-webkit-box-sizing: border-box;
+		box-sizing: border-box;
+		border: 1px solid #ccc;
+		background: #F9F9F9;
+	}
+	#workbench.wb_reduced {
+		right: -250px;
+	}
+	#workbench_title {
+		padding-top: 5px;
+		font-weight: bold;
+	}
+	#save_button {
+		position: absolute;
+		bottom: 5px;
+		left: 5px;
+	}
+	#wb_col_1 {
+	    float: left;
+	}
+	#wb_col_2 {
+	    float: left;
+		padding-left: 20px;
+	}
+	#transliteration {
+		padding-top: 15px;
+		padding-bottom: 10px;
+	}
+	button#add_normalization, button#add_annotation {
+		width: 20px;
+		height: 21px;
+	}
+	#normalization_suggestions {
+		padding-top: 10px;
+		width: 174px;
+	}
+	#normalization_suggestions_lst li {
+	    padding-left: 3px;
+	}
+	#normalization_input{
+	    padding-left: 2px;
+	}
+	#annotation_info{
+		padding-top: 10px;
+		padding-bottom: 10px;
+	}
+	div#eaf_display {
+		float: left;
+	}
+	div.annot_wrapper {
+		padding-top: 40pt;
+		display: flex;
+		-webkit-user-select: none; /* Chrome/Safari */        
+		-moz-user-select: none; /* Firefox */
+		-ms-user-select: none; /* IE10+ */
+
+		/* Rules below not implemented in browsers yet */
+		-o-user-select: none;
+		user-select: none;
+	}
+	div.audiofragment {
+		float: left;
+	}
+	div.annot {
+		float: left;
+		padding-left: 10pt;
+		margin-right: -10pt;
+	}
+	span.participant {
+		position: absolute;
+		font-size: 8pt;
+		margin-top: -12pt;
+	}
+	span.translit {
+		text-align: center;
+		font-size: 14pt;
+	}
+	trt {
+		color: #041330;
+		font-family: Cambria;
+	}
+	nrm {
+		font-size: 10pt;
+		position: absolute;
+		margin-top: 16px;
+		font-family: Courier New;
+		color: dodgerblue;
+	}
+	lemma {
+		font-size: 8pt;
+		position: absolute;
+		margin-top: 25px;
+		font-family: Tahoma;
+		padding-left: 0.5px;
+		color: #DA9FDA;
+	}
+	morph {
+		font-size: 6pt;
+		position: absolute;
+		margin-top: 35px;
+		font-family: Lucida Console;
+		padding-left: 0.5px;
+		color: #C2A0BA;
+	}
+	.inwr span.participant {
+		color: #359DC3;
+	}
+	.inwd span.participant {
+		font-weight: 500;
+		color: #8D0000;
+	}	
+	trt.focused {
+		background-color: #FFC8EC;
+	}
+	button.fa {
+		color: black;
+		margin-left: 2pt;
+		margin-right: 10pt;
+	}
+	button.fa.off {
+		color: #838383;
+	}
+	tech {
+		color: grey;
+	}
+	note {
+		color: grey;
+		font-style: italic;
+	}
+	note:before, note:after {
+		color: grey;
+		font-style: normal;
+	}
+	note:before {
+		content: "[";
+	}
+	note:after {
+		content: "]";
+	}
+	.selected {
+		background: #F39814;
+		color: white;
+	}
+	
+</style>
+<link rel="stylesheet" type="text/css" href="{% static "font-awesome-4.4.0/css/font-awesome.min.css" %}" />
+<script type="text/javascript" src="{% static "Typo.js-master/typo/typo.js" %}" ></script>
+
+<!-- the core SM-2 and 360-player stuff 
+<script type="text/javascript" src="{% static "soundmanager-v.2.97a/demo/360-player/script/berniecode-animator.js" %}"></script>
+<link rel="stylesheet" type="text/css" href="{% static "soundmanager-v.2.97a/demo/360-player/360player.css" %}" />
+<script type="text/javascript" src="{% static "soundmanager-v.2.97a/script/soundmanager2-jsmin.js" %}" ></script>
+<script type="text/javascript" src="{% static "soundmanager-v.2.97a/demo/360-player/script/360player.js" %}" ></script>
+-->
+
+{{ media }}
+{% endblock %}
+{% block content %}
+<div id="workbench" class="wb_reduced">
+<div id='workbench_title'>workbench</div>
+<div id="wb_col_1">
+	<div id='transliteration'>
+		<span id='examined_translit'></span>
+	</div>
+	<div>
+		<input id="normalization_input" title="">
+		<button id="add_normalization" class='fa fa-clipboard'></button>
+	</div>
+	<div id='normalization_suggestions'>
+		<ol id="normalization_suggestions_lst"/>
+	</div>
+	<div id='save_button'>
+		<button id="save_to_file" class="fa fa-floppy-o">
+	</div>
+</div>
+<div id="wb_col_2">
+	<div id="annotation">
+		<button id="add_annotation" class="fa fa-tag"></button>
+		<span>Select annotation</span>
+	</div>
+	<div id='annotation_info'>
+		<ol id="annotation_suggestions_lst"/>
+	</div>
+</div>
+</div>
+{{ ctext|safe }}
+
+<script type="text/javascript">
+(function($) {	
+	var dictionary = new Typo("en_US");
+	var processing_request = false;
+	//console.log(dictionary.suggest('queryy'));
+	
+	function ajax_request(req_type, req_data){
+	//var text_id = window.location.pathname;
+	if (processing_request == true) {
+		console.log('processing previous request, please wait'); // Error to log
+		return false;
+	};
+	processing_request = true;
+	$.ajax({  //Call ajax function sending the option loaded
+		url: "../../ajax/",  //This is the url of the ajax view where you make the search 
+		//contentType: "application/json; charset=utf-8",
+		type: 'POST',
+		data: {'request_type' : req_type, 'request_data' : req_data},
+		timeout: 10000,
+		error: function(x, t, m) {
+			console.log(x, t, m);
+			processing_request = false;
+		},
+		success: function(response) {
+			result = $.parseJSON(response);  // Get the results sended from ajax to here
+			processing_request = false
+			if (result.error) { // If the function fails
+				console.log(result.error_text); // Error to log
+			} else {
+				if (req_type == 'trt_annot_req') {
+					list_normlz_suggestions(result.result)
+				}
+				else if (req_type == 'annot_suggest_req') {
+					list_annot_suggestions(result.result)
+				}
+			}
+		}
+	});
+	};
+	
+	function wb_annotation_mode () {
+		$( "#workbench" ).removeClass( "wb_reduced", 1000, "easeOutBounce");
+		$('#wb_col_1').children().attr('style', 'pointer-events: none;opacity: 0.4;');
+	};
+	function wb_normlization_mode () {
+		$('#annotation_suggestions_lst').empty();
+		$('#wb_col_1').children().removeAttr('style');
+		$( "#workbench" ).addClass( "wb_reduced", 1000, "easeOutBounce");
+	};
+	
+	function activate_trt(trt_tag) {
+		/* prepering <trt> for (re)suggestion of <nrm> */
+		$('#normalization_suggestions_lst').empty();
+		$('#normalization_input').val('');
+		wb_normlization_mode();
+		$('trt').removeClass('focused');
+		trt_tag.addClass('focused');
+		//console.log($(this).text());
+		$('#examined_translit').text(trt_tag.text());
+		ajax_request('trt_annot_req', {'trt' : trt_tag.text(),});
+	};
+	
+	function list_normlz_suggestions(suggestions_lst) {
+		lst_container_tag = $('#normalization_suggestions_lst');
+		for (var i in suggestions_lst){
+			var tag = $('<li>'+suggestions_lst[i][0]+'</li>')
+			lst_container_tag.append(tag);
+			if (i == 0) {
+				tag.addClass("selected");
+				$('#normalization_input').val(suggestions_lst[i][0]);
+			};
+		};
+		$('#normalization_suggestions_lst li').click(function(e) {
+			$(this).addClass("selected").siblings().removeClass("selected");
+			$('#normalization_input').val($(this).text())
+		});
+	};
+	
+	/* LIST ANNOTATION SUGGESTIONS (and add to DOM, if only one) */
+	function list_annot_suggestions(suggestions_lst) {
+		lst_container_tag = $('#annotation_suggestions_lst');
+		lst_container_tag.empty();
+		for (var i in suggestions_lst){
+			var tag = $('<li><span class="lemma_suggestion">'+suggestions_lst[i][0]+'</span> <span class="morph_suggestion">'+suggestions_lst[i][1]+'</span></li>')
+			lst_container_tag.append(tag);
+			if (i == 0) {
+				tag.addClass("selected");
+			}
+			else if (i > 0) {
+				wb_annotation_mode();
+			};
+		};
+		if (i==0) {
+			set_annotation();
+		};
+		$('#annotation_suggestions_lst li').click(function(e) {
+			$(this).addClass("selected").siblings().removeClass("selected");
+		});
+	};
+	
+	/*AUDIO: PART 1*/
+	var audio = $('#elan_audio')[0];
+	var segmentEnd;
+	audio.addEventListener('timeupdate', function (){
+		if (segmentEnd && audio.currentTime >= segmentEnd) {
+			stop_audio();
+		};
+		//console.log(audio.currentTime, segmentEnd);
+	}, false);
+	function stop_audio() {
+		audio.pause();
+		$('.fa-play').removeClass('off');
+		$('.fa-pause').removeClass('fa-pause').addClass('fa-play');
+		console.log('audio terminated', audio.currentTime);
+	};
+	
+	/* TEXT MEASURMENTS */
+	function getTextWidth(tag) {
+		// re-use canvas object for better performance
+		var text = tag.text()
+		var canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement("canvas"));
+		var context = canvas.getContext("2d");
+		context.font = tag.css('font');
+		var metrics = context.measureText(text);
+		return metrics.width;
+	};
+	
+	/* FIND NEXT IN DOM */
+	function nextInDOM(_selector, _subject) {
+		var next = getNext(_subject);
+		while(next.length != 0) {
+			var found = searchFor(_selector, next);
+			if(found != null) return found;
+			next = getNext(next);
+		}
+		return null;
+	};
+	function getNext(_subject) {
+		if(_subject.next().length > 0) return _subject.next();
+		return getNext(_subject.parent());
+	};
+	function searchFor(_selector, _subject) {
+		if(_subject.is(_selector)) return _subject;
+		else {
+			var found = null;
+			_subject.children().each(function() {
+				found = searchFor(_selector, $(this));
+				if(found != null) return false;
+			});
+			return found;
+		}
+		return null; // will/should never get here
+	};
+	
+	/* ANNOTATION TO DOM: FINAL */
+	
+	function set_annotation () {
+	
+		/* adding normalization, lemma and morphology tags to DOM */
+		var norm_tag = $('<nrm>'+$('#normalization_input').val()+'</nrm>');
+		var lemma_tag = $('<lemma>'+$('#annotation_suggestions_lst li.selected .lemma_suggestion' ).text()+'</lemma>');
+		var morph_tag = $('<morph>'+$('#annotation_suggestions_lst li.selected .morph_suggestion' ).text()+'</morph></info>');
+		
+		$('trt.focused').parent().children('nrm, lemma, morph').remove();
+		
+		$('trt.focused').parent().prepend(morph_tag);
+		$('trt.focused').parent().prepend(lemma_tag);
+		$('trt.focused').parent().prepend(norm_tag);
+
+		/* adjusting spacing*/
+		var len_transcript = getTextWidth($('.focused'));
+		var len_morph = getTextWidth(morph_tag);
+		var len_norm = getTextWidth(norm_tag);
+		if (len_morph > len_transcript && len_morph > len_norm) { 
+			$('trt.focused').css('margin-right', len_morph - len_transcript);
+		}
+		else if (len_norm > len_morph && len_norm > len_transcript) {
+			$('.focused').css('margin-right', len_norm - len_transcript)
+		}
+		else {
+			$('trt.focused').removeAttr('style');
+			};
+		/* continuing to next token*/
+		activate_trt(nextInDOM('trt', $('trt.focused')));	
+	}
+	
+	
+	/* ADJUST SPACING FOR DOM ON INITIAL LOAD */
+	function adjust_DOM_spacing() {
+		$('token').each(function( index ) {
+			if ( $(this).children('morph').length ) {
+				var len_transcript = getTextWidth( $(this).children('trt') );
+				var len_morph = getTextWidth( $(this).children('morph') );
+				var len_norm = getTextWidth( $(this).children('nrm') );
+				if (len_morph > len_transcript && len_morph > len_norm) { 
+					$(this).css('margin-right', len_morph - len_transcript);
+				}
+				else if (len_norm > len_morph && len_norm > len_transcript) {
+					$(this).children('trt')[0].css('margin-right', len_norm - len_transcript)
+				}
+			}
+		});
+	}
+	
+	/* 
+	********************************************************
+	DOM EVENTS ONLY: 
+	********************************************************
+	*/
+	
+	$(document).ready(function() {
+	
+		/* INITIAL ACTIONS ON LOAD */
+		adjust_DOM_spacing();
+		
+		/*AUDIO: PART 2*/
+		$('.audiofragment').click(function(e) {
+			same = $(this).children(".fa-pause").length
+			if (same){
+				stop_audio();
+				return false
+			};
+			if ( $('.fa-pause').length !=0) {
+				return false
+			};
+			$(this).children("button:first").removeClass('fa-play').addClass('fa-pause');
+			segmentEnd = $(this).attr('endtime');
+			audio.currentTime = $(this).attr('starttime');
+			//console.log(audio.currentTime);
+			audio.play();
+			$('.fa-play').addClass('off');
+			console.log('audio on', audio.currentTime, segmentEnd, audio);
+		});
+		
+		$('trt').click(function(e) {
+			activate_trt($(this));
+		});
+		
+		$('#save_to_file').click(function(e){
+			ajax_request('save_elan_req', {'html' : '<div>'+$('.eaf_display').html()+'</div>',});	
+		});
+		
+		$('#add_normalization').click(function(e) {
+			/* looking for annotation variants */
+			ajax_request('annot_suggest_req', {'nrm' : $('#normalization_input').val(),});	
+		});
+		
+		$('#add_annotation').click(function(e) {
+			/* confirming choosen annotation */
+			set_annotation ();
+		});
+	});
+})(django.jQuery);
+
+</script>
+
+{% endblock %}
