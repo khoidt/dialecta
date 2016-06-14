@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.db.models import Q
 from info.models import *
-
+from reversion.admin import VersionAdmin
 
 class PersonalRelationInline(admin.TabularInline):
 
@@ -35,7 +35,8 @@ class LanguageRelationInline(admin.TabularInline):
     extra = 1
     verbose_name = 'Language'
 
-class SpeakerAdmin(admin.ModelAdmin):
+@admin.register(Speaker)
+class SpeakerAdmin(VersionAdmin):
 
   list_display = ('last_name', 'first_name','patronimic_name', 'sex', 'year_of_birth', 'education')
 
@@ -55,10 +56,20 @@ class SpeakerAdmin(admin.ModelAdmin):
     )
   readonly_fields = ['photo_preview']
 
-admin.site.register(Speaker, SpeakerAdmin)
-#admin.site.register(PersonalRelation)
-admin.site.register(Location)
-admin.site.register(RelationType)
-admin.site.register(EducationType)
-admin.site.register(Interviewer)
+@admin.register(Location)
+class LocationAdmin(VersionAdmin):
+  pass
+
+@admin.register(RelationType)
+class RelationTypeAdmin(VersionAdmin):
+  pass
+
+@admin.register(EducationType)
+class EducationTypeAdmin(VersionAdmin):
+  pass
+
+@admin.register(Interviewer)
+class EducationInterviewerAdmin(VersionAdmin):
+  pass
+
 

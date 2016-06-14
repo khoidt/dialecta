@@ -14,7 +14,7 @@ import json
 from django_ajax.decorators import ajax
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-
+from reversion.admin import VersionAdmin
 
 ##class RenameCheckboxAdminForm(forms.ModelForm):
 ##    # custom field not backed by database
@@ -29,8 +29,8 @@ from django.views.decorators.csrf import csrf_exempt
 ##        model = Recording
 ##        fields = "__all__"
 
-
-class RecordingAdmin(admin.ModelAdmin):
+@admin.register(Recording)
+class RecordingAdmin(VersionAdmin):
 
   editor_template = 'editor.html'
   trainer_template = 'trainer.html'
@@ -131,13 +131,34 @@ class RecordingAdmin(admin.ModelAdmin):
       self.processing_request = False
       return HttpResponse(json.dumps(response))
 
+@admin.register(Language)
+class LanguageAdmin(VersionAdmin):
+  pass
 
-admin.site.register(Language)
-admin.site.register(Dialect)
-admin.site.register(Lemma)
-admin.site.register(Form)
-admin.site.register(TokenToForm)
-admin.site.register(Token)
-admin.site.register(Recording, RecordingAdmin)
-admin.site.register(Corpus)
-admin.site.register(NormalizationModel)
+@admin.register(Dialect)
+class DialectAdmin(VersionAdmin):
+  pass
+
+@admin.register(Lemma)
+class LemmaAdmin(VersionAdmin):
+  pass
+
+@admin.register(Form)
+class FormAdmin(VersionAdmin):
+  pass
+
+@admin.register(TokenToForm)
+class TokenToFormAdmin(VersionAdmin):
+  pass
+
+@admin.register(Token)
+class TokenAdmin(VersionAdmin):
+  pass
+
+@admin.register(Corpus)
+class CorpusAdmin(VersionAdmin):
+  pass
+
+@admin.register(NormalizationModel)
+class NormalizationModelAdmin(VersionAdmin):
+  pass

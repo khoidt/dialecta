@@ -52,6 +52,7 @@ INSTALLED_APPS = (
     'django_ajax',
     "geoposition",
     'django_cleanup',
+    'reversion',
 )
 
 MIDDLEWARE_CLASSES = (
