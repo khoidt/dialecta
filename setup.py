@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import os
 from setuptools import setup
 
 virtenv = os.environ['OPENSHIFT_PYTHON_DIR'] + '/virtenv/'
@@ -18,7 +18,7 @@ except IOError:
 
 setup(
     # GETTING-STARTED: set your app name:
-    name='Dialects',
+    name='Trimco',
     # GETTING-STARTED: set your app version:
     version='1.0-alpha',
     # GETTING-STARTED: set your app description:
@@ -31,7 +31,7 @@ setup(
     url='http://www.python.org/sigs/distutils-sig/',
     # GETTING-STARTED: define required django version:
     install_requires=[
-        'Django==1.8.4'
+        'Django==1.9.7'
     ],
     dependency_links=[
         'https://pypi.python.org/simple/django/'

@@ -1,11 +1,15 @@
-import pymorphy2, re, codecs, os
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import pymorphy2, re, codecs, os, sys, json
 from pympi import Eaf, Elan
 from lxml import etree
-
 from urllib.request import urlopen, URLError
 from urllib.parse import quote
-
 from decimal import *
+from django.conf import settings
+from django.conf.urls.static import static
+from corpora.models import *
 
 
 class glyph_equation:
@@ -135,10 +139,23 @@ class orthographic_data:
 
 class standartizator(orthographic_data):
   
-  def __init__(self, lang=''):
+  def __init__(self, dialect=''):
 
-    self.lang = lang
+    self.dialect = dialect
+    #print(dialect)
+    self.model = NormalizationModel.objects.get(to_dialect = self.dialect)    
     self.morph_rus = pymorphy2.MorphAnalyzer()
+    self.annotation_menu = annotation_menu_from_xml("grammemes_pymorphy2.xml")
+
+  def update_model(self, examples_dict, exceptions_lst):
+
+    examples_str = ''
+    for key in examples_dict.keys():
+      if type(examples_dict[key][0]) == str:
+        examples_str += '%s;%s\n' %(key, ';'.join(examples_dict[key]))
+    self.model.examples = examples_str
+    self.model.exceptions = ';'.join(exceptions_lst)
+    self.model.save()
 
   def yandex_spellchecker(self, token):
 
@@ -169,6 +186,7 @@ class standartizator(orthographic_data):
     try:
       self.yandex_spellchecker('')
     except URLError:
+      print('spellchecker off: yandex web spellchecker API access error')
       self.spellchecker_option = False
     
     self.examples_counter = 0
@@ -176,22 +194,52 @@ class standartizator(orthographic_data):
     self.fail_counter = 0
     self.uneq_counter = 0
     self.t_s_diff = 0
-    examples_lst = self.load_examples_from_file('orth_%s.csv' %(self.lang))
-    for trans, standz in examples_lst:
-      self.check_and_learn(trans, standz)
+    #path = os.path.join(os.environ.get('OPENSHIFT_REPO_DIR'), 'wsgi', 'static', 'orth_%s.csv' %(self.lang))
+    #examples_lst = self.load_examples_from_file(path)
+    self.examples_lst = self.load_examples_from_model()
+    self.examples_dict = self.get_examples_dict()
+    self.exceptions_lst = self.model.exceptions.split(';')
+    for example in self.examples_lst:
+      self.check_and_learn(example[0], example[1])
     self.print_learning_report()
+
+  def get_examples_dict(self):
+    examples_dict = {}
+    for el in self.examples_lst:
+      examples_dict[el[0]] = el[1:]
+    return examples_dict
     
   def print_learning_report(self):
     if self.check_and_learn_option == True and self.learning_report_option == True and self.examples_counter > 0:
-      print('Total checked: %s\nFound: %s: %s %%\nFailed: %s: %s %%' %(self.examples_counter,
+      '''print('Total checked: %s\nFound: %s: %s %%\nFailed: %s: %s %%' %(self.examples_counter,
                                                                    self.found_counter,
                                                                    self.percent(self.found_counter, self.examples_counter),
                                                                    self.fail_counter,
                                                                    self.percent(self.fail_counter, self.examples_counter),
-                                                                   ))
+                                                                   ))'''
       if self.t_s_diff > 0 and self.uneq_counter > 0:
+        pass
         print('average gap between translit and standartized: %s' %(self.t_s_diff / self.uneq_counter))
-      
+
+
+  def load_examples_from_model(self):
+
+    print('loading examples from db')
+    examples_lst = []
+    for line in self.model.examples.splitlines():
+      line = line.rstrip()
+      if 'sep=' not in line and len(line.split(';')) == 2:
+        trans, standz = line.split(';')
+        #sys.stdout.buffer.write(line.encode('utf-8'))
+        if len(trans) != 0 and len(standz) != 0 and [trans.lower(), standz.lower()] not in examples_lst:
+          examples_lst.append([trans.lower(), standz.lower()])
+      if 'sep=' not in line and len(line.split(';')) == 3:
+        trans, standz, additional = line.split(';')
+        if len(trans) != 0 and len(standz) != 0 and len(additional) != 0 and [trans.lower(), standz.lower(), additional.lower()] not in examples_lst:
+          examples_lst.append([trans.lower(), standz.lower(), additional.lower()])
+    examples_lst = sorted(examples_lst, key = lambda item: self.get_example_stability_rating(item[0], item[1]))
+    return examples_lst
+    
   def load_examples_from_file(self, path):
 
     examples_lst = []
@@ -200,16 +248,17 @@ class standartizator(orthographic_data):
       print('loading examples from dictionary: %s' %(path))
       file = codecs.open(path, 'r', 'utf-8')
       for line in file:
-        line = line[:-2]
-        if 'sep=' not in line:
+        line = line.rstrip()
+        if 'sep=' not in line and len(line.split(';')) == 2:
           trans, standz = line.split(';')
+          #sys.stdout.buffer.write(line.encode('utf-8'))
+          #print([trans.encode('utf-8'), standz.encode('utf-8')])
           if len(trans) != 0 and len(standz) != 0 and [trans.lower(), standz.lower()] not in examples_lst:
             examples_lst.append([trans.lower(), standz.lower()])
       examples_lst = sorted(examples_lst, key = lambda item: self.get_example_stability_rating(item[0], item[1]))
       file.close()
     except FileNotFoundError:
       print('file reading error by loading examples dictionary')
-      pass
     return examples_lst
 
   def get_example_stability_rating(self, trans, standz):
@@ -358,11 +407,22 @@ class standartizator(orthographic_data):
     return vars_lst
 
   def get_annotation_options_list(self, token):
+    
     result_lst = []
     for annot in self.morph_rus.parse(token):
       if annot.score > 0.001:
-        result_lst.append([annot.normal_form, str(annot.tag), annot.score])
+        tag = self.annotation_menu.override_abbreviations(str(annot.tag))
+        result_lst.append([annot.normal_form, tag, annot.score])
     return result_lst
+
+'''
+def pack_tags_to_dict(tags_lst, p):
+
+  for tag in ['POS', 'animacy', 'aspect', 'case', 'gender', 'involvement',
+            'mood', 'number', 'person', 'tense', 'transitivity', 'voice']:
+    if getattr(p.tag, tag)!=None:
+      tags_dict[tag] = getattr(p.tag, tag)
+'''
 
 class Tier:
 
@@ -382,7 +442,7 @@ class Tier:
     if '_i_' in self.name:
       self.side = 'interviewer'
     elif '_n_' in self.name:
-      self.side = 'informant'
+      self.side = 'speaker'
       
 
 class ElanObject:
@@ -394,6 +454,19 @@ class ElanObject:
     self.Eaf.clean_time_slots()
     self.load_tiers()
     self.load_annotation_data()
+    self.load_participants()
+
+  def load_participants(self):
+
+    participants_lst = []
+    for tier_obj in self.tiers_lst:
+      try:
+        p_title = tier_obj.attributes['PARTICIPANT'].title()
+        if p_title not in participants_lst:
+          participants_lst.append(p_title)
+      except KeyError:
+        pass
+    self.participants_lst = participants_lst
 
   def load_tiers(self):
 
@@ -447,16 +520,24 @@ class ElanObject:
       pass
     Elan.to_eaf(self.path, self.Eaf, pretty=True)
     os.remove(self.path+'.bak')
-    
+
 class elan_to_html:
 
-  def __init__(self, file_obj):
+  def __init__(self, file_obj, _format=''):
 
+    self.file_obj = file_obj
+    self.elan_obj = ElanObject(self.file_obj.data.path)
+    self.audio_file_path = self.file_obj.audio.name
+    self.format = _format
+    self.annotation_menu = annotation_menu_from_xml("grammemes_pymorphy2.xml")
+    self.build_html()
+
+  def build_html(self):
+    
     html = ''
-    self.elan_obj = ElanObject(file_obj.data.path)
+    print('Transcription > Standard learning examples:', self.file_obj.data.path)
     i = 0
-    audio_file_path = file_obj.data.name[2:-4]+'.mp3'
-    html += self.get_audio_link(audio_file_path)
+    html += self.get_audio_link()
     self.participants_dict = {}
     for annot_data in self.elan_obj.annot_data_lst:
       tier_name = annot_data[3]
@@ -466,12 +547,11 @@ class elan_to_html:
       annot_tokens_dict = self.get_additional_tags_dict(tier_name+'_annotation', annot_data[0], annot_data[1])
       
       [participant, tier_status] = self.get_participant_tag_and_status(tier_obj)
-      audio_div = self.get_audio_annot_div(audio_file_path, annot_data[0] / 1000, annot_data[1] / 1000)
+      audio_div = self.get_audio_annot_div(annot_data[0], annot_data[1])
       annot_div = self.get_annot_div(tier_name, participant, annot_data[2], normz_tokens_dict, annot_tokens_dict)
       html += '<div class="annot_wrapper %s">%s%s</div>' %(tier_status, audio_div, annot_div)
       i += 1
     self.html = '<div class="eaf_display">%s</div>' %(html)
-
 
   def get_additional_tags_dict(self, tier_name, start, end):
 
@@ -507,16 +587,15 @@ class elan_to_html:
     transcript = self.prettify_transcript(transcript)
     if annot_tokens_dict != {}:
       transcript = self.add_annotation_to_transcript(transcript, normz_tokens_dict, annot_tokens_dict)
-    return '<div class="annot" tier_name="%s"><span class="participant">%s</span><span class="translit">%s</span></div>' %(tier_name, participant, transcript,)
+    return '<div class="annot" tier_name="%s"><span class="participant">%s</span><span class="transcript">%s</span></div>' %(tier_name, participant, transcript,)
 
-  def get_audio_annot_div(self, audio_file_path, stttime, endtime):
+  def get_audio_annot_div(self, stttime, endtime):
     
-    return '<div class="audiofragment" starttime="%s" endtime="%s"><button class="fa fa-play"></button></div>' %(stttime, endtime)
-    #return '<div class="audiofragment ui360"><a href="/media/%s" starttime="%s" endtime="%s"></a></div>' %(audio_file_path, stttime, endtime)
+    return '<div class="audiofragment" starttime="%s" endtime="%s"><button class="fa fa-spinner off"></button></div>' %(stttime, endtime)
 
-  def get_audio_link(self, audio_file_path):
+  def get_audio_link(self):
     
-    return '<audio id="elan_audio" src="/media/%s" preload></audio>' %(audio_file_path)
+    return '<audio id="elan_audio" src="/media/%s" preload></audio>' %(self.audio_file_path)
 
   def prettify_transcript(self, transcript):
 
@@ -524,25 +603,25 @@ class elan_to_html:
       transcript = transcript[:-1]
     new_transcript = ''
     tokens_lst = re.split('([ ])', transcript)
+    
     for el in tokens_lst:
-      if el in '...':
-        el = '<tech>%s</tech>' %(el)
-      elif el[-1] in ['?','!']:
-        el = '<token><trt>%s</trt></token><tech>%s</tech>' %(el[:-1], el[-1])
-      elif '[' in el and ']' in el:
-        if el[0] != '[':
-          tail, el = re.split('[\[]', el)
-          new_transcript += '<token><trt>%s</trt></token> ' %(tail)
-          el = '[%s' %(el)
-        tail = ''
-        if el[-1] != ']':
-          el, tail = re.split('[\]]', el)
-          tail = ' <token><trt>%s</trt></token>' %(tail)
-          el = '%s]' %(el)
-        el = '<note>%s</note>%s' %(el[1:-1], tail)
-      elif el!=' ':
-        el = '<token><trt>%s</trt></token>' %(el)
-      new_transcript += el
+      el = el.strip()
+      if len(el) > 0:
+        if el in ['...','?','!']:
+          el = '<tech>%s</tech>' %(el)
+        elif el[-1] in ['?','!']:
+          el = '<token><trt>%s</trt></token><tech>%s</tech>' %(el[:-1], el[-1])
+        elif '[' in el and ']' in el:
+          el_lst = list(filter(re.compile('[a-zA-Z]').match, re.split('[\[\]]', el))) #splitting [ ] and removing non-alphabetic values
+          el = ''
+          for el_2 in el_lst:
+            if 'unint' in el_2 or '.' in el_2:
+              el += '<note>%s.</note>' %(el_2.strip('.'))
+            else:
+              el += '<token><trt>%s</trt></token>' %(el_2)
+        elif el not in [' ', '']:
+          el = '<token><trt>%s</trt></token>' %(el)
+        new_transcript += el
     return new_transcript
 
   def add_annotation_to_transcript(self, transcript, normz_tokens_dict, annot_tokens_dict):
@@ -552,7 +631,8 @@ class elan_to_html:
     for tag in transcript_obj.iterchildren():
       if tag.tag == 'token':
         if i in annot_tokens_dict.keys():
-          tag.insert(0, etree.fromstring('<morph>'+annot_tokens_dict[i][1]+'</morph>'))
+          morph_tags = self.annotation_menu.override_abbreviations(annot_tokens_dict[i][1]) #DB
+          tag.insert(0, etree.fromstring('<morph>'+morph_tags+'</morph>'))
           tag.insert(0, etree.fromstring('<lemma>'+annot_tokens_dict[i][0]+'</lemma>'))
         if i in normz_tokens_dict.keys():
           tag.insert(0, etree.fromstring('<nrm>'+normz_tokens_dict[i][0]+'</nrm>'))
@@ -566,8 +646,8 @@ class elan_to_html:
       tier_name = el.xpath('*[@class="annot"]/@tier_name')[0]
       raw_start = el.xpath('*[@class="audiofragment"]/@starttime')[0]
       raw_end = el.xpath('*[@class="audiofragment"]/@endtime')[0]
-      start = int(Decimal(raw_start) * 1000)
-      end = int(Decimal(raw_end) * 1000)
+      start = int(Decimal(raw_start))
+      end = int(Decimal(raw_end))
       t_counter = 0
       annot_value_lst = []
       nrm_value_lst = []
@@ -585,3 +665,118 @@ class elan_to_html:
       if nrm_value_lst != []:
         self.elan_obj.add_extra_tags(tier_name, start, end, '|'.join(nrm_value_lst), 'standartization')
     self.elan_obj.save()
+
+  def build_annotation_menu(self):
+    
+    return [self.annotation_menu.menu_html_str_1,
+            self.annotation_menu.menu_html_str_2,
+            ]
+
+from morphology.models import GlossingRule
+
+
+class annotation_menu_from_xml:
+
+  def __init__(self, xml_name):
+
+    path = os.path.join(settings.STATIC_ROOT, '%s' %(xml_name))
+    #path = os.path.join(os.environ.get('OPENSHIFT_REPO_DIR'), 'wsgi', 'static', '%s' %(xml_name))
+    self.tree = etree.parse(path)
+    self.build_terms_dict()
+    lemma_input_str = '<div class="manualAnnotationContainer"><label id="lemma_input">Lemma</label><input class="manualAnnotation" id="lemma_input" title="Lemma"></div>'
+    form_input_str = '<div class="manualAnnotationContainer"><label id="form_input">Form</label><input class="manualAnnotation" id="form_input" title="Form"></div>'
+    self.menu_html_str_1 = '<form style="display: table;">%s%s%s</form>' %(lemma_input_str, form_input_str, self.get_main_options())
+    self.menu_html_str_2 = '<form>%s</form>' %(self.get_extending_options())
+    
+  def build_terms_dict(self):
+
+    self.terms_dict = {'ALLFORMS': {'newID':'ALLFORMS', 'propertyOf':'', 'extends':''}}
+    for grammeme_tag in self.tree.xpath("grammeme"):
+      name = grammeme_tag.xpath('name/text()')[0]
+      try:
+        newID = grammeme_tag.xpath('override/text()')[0]
+      except IndexError:
+        newID = name
+      propertyOf = ''
+      extends = ''
+      if grammeme_tag.xpath('@propertyOf')!=[]:
+        propertyOf = grammeme_tag.xpath('@propertyOf')[0]
+      if grammeme_tag.xpath('@extends')!=[]:
+        propertyOf = grammeme_tag.xpath('@extends')[0]
+      self.terms_dict[name] = {'newID': newID, 'propertyOf': propertyOf, 'extends': extends}
+
+  def get_dependences(self, dep_lst_raw):
+
+    dep_lst_final = []
+    for item in dep_lst_raw:
+      tags, index = item.split(':')
+      index = int(index)
+      tags_lst = list(map(lambda tag: self.terms_dict[tag]['newID'], tags.split('.')))
+      dep_lst_final.append({'tags':tags_lst, 'index':index})
+    return dep_lst_final
+
+  def get_options_for_id(self, id_raw):
+    
+    options_str = ''
+    for option_tag in self.tree.xpath("grammeme[contains(@propertyOf,'%s')]" %(id_raw)):
+      option_id = self.terms_dict[option_tag.xpath('name/text()')[0]]['newID']
+      options_str = "%s<option id='%s'>%s</option>" %(options_str, option_id, option_id)
+    return options_str
+
+  def get_main_options(self):
+
+    main_options_tag_str = ''
+    
+    for grammeme_tag in self.tree.xpath('grammeme[@toForms and not(@propertyOf)]'):
+      label = grammeme_tag.xpath('label/text()')[0]
+      id_raw = grammeme_tag.xpath('name/text()')[0]
+      id_final = self.terms_dict[id_raw]['newID']
+      dep_lst = grammeme_tag.xpath('@toForms')[0].split(',')
+      label_tag_str = '<label for="%s">%s</label>' %(id_final, label)
+      select_tag_str = "<select class='manualAnnotation' id='%s' title='%s' data-dep='%s'>%s</select>" %(id_final,
+                                                                                                         label,
+                                                                                                         json.dumps(self.get_dependences(dep_lst)),
+                                                                                                         self.get_options_for_id(id_raw),
+                                                                                                         )
+      main_options_tag_str = '%s<div class="manualAnnotationContainer">%s%s</div>' %(main_options_tag_str, label_tag_str, select_tag_str)
+    return main_options_tag_str
+    #return '<div id="basic_params">%s</div>' %(main_options_tag_str)
+
+  def get_extending_options(self):
+
+    main_options_tag_str = ''
+    for grammeme_tag in self.tree.xpath('grammeme[@extends and not(@propertyOf)]'):
+      label = grammeme_tag.xpath('label/text()')[0]
+      id_raw = grammeme_tag.xpath('name/text()')[0]
+      id_final = self.terms_dict[id_raw]['newID']
+      to_forms = grammeme_tag.xpath('@extends')[0].split(',')
+      #print(label, to_forms)
+      select_tag_str = "<label><input type='checkbox' class='manualAnnotation' name='%s' value='%s' data-dep='%s'>%s</label>" %(id_final,
+                                                                                                                                id_final,
+                                                                                                                                json.dumps(to_forms),
+                                                                                                                                label,
+                                                                                                                                )
+      main_options_tag_str = '%s<div class="manualAnnotationContainer">%s</div>' %(main_options_tag_str, select_tag_str)
+    return main_options_tag_str
+    #return '<div id="extends">%s</div>' %(main_options_tag_str)
+
+  def override_abbreviations(self, tag):
+
+    tags_lst = re.split('[, -]', tag)
+    i = 0
+    while i < len(tags_lst):
+      try:
+        tags_lst[i] = self.terms_dict[tags_lst[i]]['newID']
+      except KeyError:
+        pass
+      #FROM DB:
+      '''
+      try:
+        tags_lst[i] = GlossingRule.objects.get(abbr_overrides__contains = tags_lst[i]).abbreviation
+      except:
+        tags_lst[i] = tags_lst[i] #UPPER CASE
+        tags_lst[i] = tags_lst[i].upper() #UPPER CASE
+      '''
+      i += 1
+    return '-'.join(tags_lst)
+  

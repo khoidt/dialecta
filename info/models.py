@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from django.db import models
 from geoposition.fields import GeopositionField
 from django.core.exceptions import ObjectDoesNotExist
@@ -5,6 +8,14 @@ from django.core.exceptions import ObjectDoesNotExist
 SEX_CHOICES = (
     ('m', 'Male'),
     ('f', 'Female'),
+)
+
+EDUCATION_CHOICES = (
+	('No', 'No education'),
+        ('PS', 'Primary school education'),
+        ('SS', 'Secondary school education'),
+        ('PE', 'Professional education'),
+        ('HE', 'High education'),
 )
 
 class Location(models.Model):
@@ -15,25 +26,49 @@ class Location(models.Model):
   def __str__(self):
     return self.name
 
-class Person(models.Model):
+class Interviewer(models.Model):
 
   last_name = models.CharField(max_length=15,)
   first_name = models.CharField(max_length=15,)
   patronimic_name = models.CharField(max_length=20,
                                      blank=True,
                                      )
+  year_of_birth = models.IntegerField(null=True,)
+  year_of_enrollment = models.IntegerField(null=True,)
+  affiliation = models.CharField(max_length=100,blank=True,)
+  role = models.CharField(max_length=40,)
+  
+
+class Speaker(models.Model):
+
+  last_name = models.CharField(max_length=15,)
+  first_name = models.CharField(max_length=15,)
+  patronimic_name = models.CharField(max_length=20,
+                                     blank=True,
+                                     )
+  other_names = models.CharField(max_length=40,
+                                     blank=True,
+                                     )
   sex = models.CharField(max_length=1, choices=SEX_CHOICES,)
   year_of_birth = models.IntegerField(null=True,)
-  year_of_death = models.IntegerField(blank=True,)
-  
-  place_of_birth = models.ForeignKey(Location)
-  
+  year_of_death = models.IntegerField(blank=True,null=True,)
+  locations = models.ManyToManyField('Location',
+                                     through='LocationRelation',
+                                     )
+  mobility = models.IntegerField(blank=True,null=True,)
+  education = models.ForeignKey('EducationType')
+  education_text = models.TextField(blank=True,)
   relations = models.ManyToManyField('self',
                                      through='PersonalRelation',
                                      symmetrical=False,
-                                     through_fields=('from_person', 'to_person'),
+                                     through_fields=('from_speaker', 'to_speaker'),
                                      )
-
+  languages = models.ManyToManyField('Language',
+                                     through='LanguageRelation',
+                                     )
+  profession = models.CharField(max_length=30,blank=True)
+  photo = models.ImageField(blank=True,)
+  details = models.TextField(blank=True,)
 
   def __str__(self):
 
@@ -41,45 +76,78 @@ class Person(models.Model):
     if self.patronimic_name !='':
       patr = ' '+self.patronimic_name
 
-    return '%s, %s%s' %(self.last_name, self.first_name, patr)
+    return '%s, %s%s %s' %(self.last_name, self.first_name, patr, self.year_of_birth)
+
+  def photo_preview(self):
+    if self.photo.url:
+      return '<img src="%s" style="height:100px; width:100px;"/>' %(self.photo.url)
+    return ''
+  photo_preview.allow_tags = True
+
+  def get_relations(self):
+    return Speaker.objects.select_related('relations')
+
+class RelationType(models.Model):
+  
+  name = models.CharField(max_length=20)
+  abbreviation = models.CharField(max_length=2)
+  assymetric_relation = models.OneToOneField('self',null=True,blank=True,on_delete=models.CASCADE,
+                                             verbose_name = 'Assymetric reversed relation')
+
+  def __str__(self):
+    if self.assymetric_relation != None:
+      return '%s <> %s' %(self.name, self.assymetric_relation.name)
+    return '%s <> %s' %(self.name, self.name)
 
 
-RELATION_CHOICES = (
-  ('ch', 'child'),
-  ('pr', 'parent'),
-  ('sp', 'spouse'),
-  ('sb', 'sibling'),
-  ('gc', 'grandchild'),
-  ('gp', 'grandparent'),
-  ('fr', 'friend'),
-  ('ng', 'neighbor'),
-  ('lv', 'lover'),
-  )
+class EducationType(models.Model):
+  
+  name = models.CharField(max_length=30)
+  abbreviation = models.CharField(max_length=5)
 
-ASYMMETRIC_RELATIONS_DICTIONARY = {
-  'ch' : 'pr',
-  'pr' : 'ch',
-  'gc' : 'gp',
-  'gp' : 'gc',
-  }
+  def __str__(self):
+    return self.name
+
+
+##RELATION_CHOICES = (
+##  ('ch', 'child'),
+##  ('pr', 'parent'),
+##  ('sp', 'spouse'),
+##  ('sb', 'sibling'),
+##  ('gc', 'grandchild'),
+##  ('gp', 'grandparent'),
+##  ('fr', 'friend'),
+##  ('ng', 'neighbor'),
+##  ('lv', 'lover'),
+##  )
+ 
+##ASYMMETRIC_RELATIONS_DICTIONARY = {
+##  'child' : 'parent',
+##  'parent' : 'child',
+##  'grandchild' : 'grandparent',
+##  'grandparent' : 'grandchild',
+##  }
 
 class PersonalRelation(models.Model):
 
-  # Model of defining relations between persons
+  # Model of defining relations between speakers
   
   # Include overrides of model save and delete functions
   # that additionaly create, edit and delete a
   # reverse relation that mirrors the one being modified.
 
-  # Relation types are included in RELATION_CHOICES
-  # Pairs of asymmetrc relation types are additionaly listed in the ASYMMETRIC_RELATIONS_DICTIONARY
+  # Relation types are included in RelationType
+  # Asymmetrc relation types are specified in RelationType.assymetric_relation
 
-  from_person = models.ForeignKey('Person')
-  to_person = models.ForeignKey('Person',
-                                related_name='related_person',
+  relation_type = models.ForeignKey(RelationType)
+  from_speaker = models.ForeignKey('Speaker')
+  to_speaker = models.ForeignKey('Speaker',
+                                related_name='related_speaker',
                                 )
-  relation_type = models.CharField(max_length=15, choices=RELATION_CHOICES)
   notes = models.TextField(blank=True,)
+
+  class Meta:
+    verbose_name_plural = 'VII. Relations with other speakers'
 
   def save(self, *args, **kwargs):
 
@@ -111,8 +179,8 @@ class PersonalRelation(models.Model):
 
     try:
       rev_rel_obj = PersonalRelation.objects.get(
-        from_person = self.to_person,
-        to_person = self.from_person,
+        from_speaker = self.to_speaker,
+        to_speaker = self.from_speaker,
         )
       return rev_rel_obj
     except ObjectDoesNotExist:
@@ -121,16 +189,60 @@ class PersonalRelation(models.Model):
   def create_reversed_relation(self):
 
       rev_rel_obj = PersonalRelation(
-        from_person = self.to_person,
-        to_person = self.from_person,
+        from_speaker = self.to_speaker,
+        to_speaker = self.from_speaker,
         relation_type = self.get_reversed_relation_type(),
         notes = self.notes,
       )
       rev_rel_obj.save()
     
   def get_reversed_relation_type(self):
-
-    if self.relation_type in list(ASYMMETRIC_RELATIONS_DICTIONARY.keys()):
-      return ASYMMETRIC_RELATIONS_DICTIONARY[self.relation_type]
-    return self.relation_type
     
+    if self.relation_type.assymetric_relation != None:
+      return self.relation_type.assymetric_relation
+    return self.relation_type
+
+class LocationRelation(models.Model):
+
+  to_speaker = models.ForeignKey('Speaker')
+  to_location = models.ForeignKey('Location', verbose_name = 'Location')
+  duration = models.IntegerField(verbose_name='Duration of stay (years)',blank=True,null=True)
+
+  place_of_birth = models.BooleanField()
+  living = models.BooleanField()
+  working = models.BooleanField()
+  studying = models.BooleanField()
+  military_service = models.BooleanField()
+  prison = models.BooleanField()
+  details = models.TextField(blank=True,null=True)
+
+  class Meta:
+    verbose_name_plural = 'Va. Geography of Life'
+
+class LanguageRelation(models.Model):
+
+  to_speaker = models.ForeignKey('Speaker')
+  to_language = models.ForeignKey('Language', verbose_name = 'Language')
+  native_speaker = models.BooleanField()
+  literate = models.BooleanField()
+
+  class Meta:
+    verbose_name_plural = 'VI. Linguistic Biography'
+
+class Language(models.Model):
+  
+  name = models.CharField(max_length=50)
+  abbreviation = models.CharField(max_length=5)
+
+  def __str__(self):
+    return self.abbreviation
+
+class Dialect(models.Model):
+  
+  name = models.CharField(max_length=50)
+  abbreviation = models.CharField(max_length=5)
+  to_language = models.ForeignKey('Language')
+  description = models.TextField(blank=True)
+
+  def __str__(self):
+    return self.abbreviation
