@@ -34,6 +34,8 @@
 	};
 	
 	function ajax_request(req_type, req_data){
+		
+		console.log($(location).attr('href').split('/').reverse()[2]);
 	
 		$.ajax({  //Call ajax function sending the option loaded
 			url: "../../ajax/",  //This is the url of the ajax view where you make the search 

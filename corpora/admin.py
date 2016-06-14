@@ -65,10 +65,11 @@ class RecordingAdmin(VersionAdmin):
   def get_valid_string_id(self, request):
     
     date_str = request.POST['request_data[date]']
-    person_str = request.POST['request_data[person]']
+    speaker_str = request.POST['request_data[speaker]']
     #obj = File.objects.get(id = request.path.split('/')[-3])
     #print(File.objects.all().filter(string_id__contains=date_str), obj)
     print(request.path)
+    return '%s%s_%s' %(date_str, '', speaker_str)
 
   @transaction.atomic
   def edit(self, request):
