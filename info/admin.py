@@ -42,19 +42,15 @@ class SpeakerAdmin(VersionAdmin):
 
   inlines = (PersonalRelationInline,LocationRelationInline,LanguageRelationInline)
   fieldsets = (
-    ('Photo', {'fields':(('photo_preview', 'photo')),}),
-    ('I. Name', {'fields':(('last_name','first_name'),'patronimic_name', 'other_names'),}),
-    ('II. Sex', {'fields':('sex',),}),
-    ('III. Years of life', {'fields':(('year_of_birth','year_of_death')),'classes': ('grp-collapse grp-open',)}),
-    ('IV. Education', {'fields':('education',),}),
-    ('Va. Geography of Life', {'classes': ('placeholder locationrelation_set-group',), 'fields':(),}),
-    ('Vb. Mobility', {'fields':('mobility',),}),
-    ('VI. Linguistic Biography', {'classes': ('placeholder languagerelation_set-group',), 'fields':(),}),
-    ('VII. Relations with other speakers', {'classes': ('placeholder personalrelation_set-group',), 'fields':(),}),
-    ('VIII. Profession', {'fields':('profession',),}),
-    ('IX. Other', {'fields':('details',),}),
+    #('Photo', {'fields':(('photo_preview', 'photo')),}),
+    ('Basic info', {'fields':(('string_id','sex','year_of_birth'),('last_name','first_name','patronimic_name', 'other_names'),('pob','por','pofr')),}),
+    ('Education and profession', {'fields':(('education','education_text'),('profession','mobility')),}),
+    ('Geography of Life', {'classes': ('placeholder locationrelation_set-group',), 'fields':(),}),
+    ('Other', {'fields':('details',),}),
+    ('Linguistic Biography', {'classes': ('placeholder languagerelation_set-group',), 'fields':(),}),
+    ('Relations with other speakers', {'classes': ('placeholder personalrelation_set-group',), 'fields':(),}),
     )
-  readonly_fields = ['photo_preview']
+  #readonly_fields = ['photo_preview']
 
 @admin.register(Location)
 class LocationAdmin(VersionAdmin):

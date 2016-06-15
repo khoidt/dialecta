@@ -1,4 +1,4 @@
-(function($) {
+/*(function($) {
 	
 	$(document).ready(function() {
 		//$('#id_string_id').after('<button>generate id</button>')
@@ -17,10 +17,13 @@
 		var date_str = $('#id_recording_date').val().replace(/\-/g, '');
 		var speaker_str = get_speaker_str($('#id_to_speakers :selected').text());
 		if (speaker_str != '' && date_str != '') {
-			$('#id_string_id').val(date_str + '_' + speaker_str);
-		ajax_request('string_id_update', {'date' : date_str, 'speaker' : speaker_str});
-			//console.log(date_str + '_' + speaker_str)
+			//$('#id_string_id').val(date_str + '_' + speaker_str);
+			ajax_request('string_id_update', {'date' : date_str, 'speaker' : speaker_str});
 		};
+	};
+	
+	function set_string_id(string_id) {
+		$('#id_string_id').val(string_id);
 	};
 	
 	function get_speaker_str(speaker_raw_str) {
@@ -34,14 +37,12 @@
 	};
 	
 	function ajax_request(req_type, req_data){
-		
-		console.log($(location).attr('href').split('/').reverse()[2]);
 	
 		$.ajax({  //Call ajax function sending the option loaded
-			url: "../../ajax/",  //This is the url of the ajax view where you make the search 
+			url: "/admin/corpora/recording/ajax/",  //This is the url of the ajax view where you make the search 
 			//contentType: "application/json; charset=utf-8",
 			type: 'POST',
-			data: {'request_type' : req_type, 'request_data' : req_data},
+			data: {'request_type' : req_type, 'request_data' : req_data, 'modelID' : $(location).attr('href').split('/').reverse()[2]},
 			timeout: 50000,
 			error: function(x, t, m) {
 				console.log(x, t, m);
@@ -51,10 +52,10 @@
 				if (result.error) { // If the function fails
 					console.log(result.error_text); // Error to log
 				} else {
-					console.log(result.result);
+					set_string_id(result.result);
 				}
 			}
 	});
 	};
 		
-})(django.jQuery);
+})(django.jQuery);*/

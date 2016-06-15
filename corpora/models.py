@@ -72,23 +72,49 @@ class Token(models.Model):
 
 class Recording(models.Model):
   
-  string_id = models.CharField(max_length=30,verbose_name='String ID')
-  recording_date = models.DateField(default=timezone.now)
+  #for import from google docs: filename WITHOUT mp3 or wav
+  string_id = models.CharField(max_length=30,verbose_name='Unique ID',unique=True) #C
+  recording_date = models.DateField(default=timezone.now) #COMPUTED FROM FILENAME
   recording_time = models.TimeField(blank=True, null=True)
   recording_place = models.ForeignKey(Location, blank=True, null=True)
-  data = models.FileField(storage=OverwriteStorage())
-  audio = models.FileField(storage=OverwriteStorage(), null=True)
-  recording_device = models.CharField(max_length=60, blank=True)
+
+  #should be changed to "transcription"
+  data = models.FileField(storage=OverwriteStorage(),blank=True,null=True, verbose_name='Transciption') #look into directory!
+  audio = models.FileField(storage=OverwriteStorage(), blank=True, null=True) #look into directory!
+
+  #ONLY for import from google docs: metacomment1, metacomment2, metacomment3 from the Google docs columns A, B and D
+  metacomment1 = models.CharField(max_length=100,blank=True,verbose_name='MetaComment1') #A
+  metacomment2 = models.CharField(max_length=100,blank=True,verbose_name='MetaComment2') #B
+  metacomment3 = models.CharField(max_length=100,blank=True,verbose_name='MetaComment3') #D
+
+  title = models.CharField(blank=True,max_length=100) #G
+  topics = models.TextField(blank=True)  #H
+  comments = models.TextField(blank=True) #I
+  
+  #ONLY for import from google docs: "participants", "informant"
+  participants_field = models.TextField(verbose_name='OF: participants',blank=True) #I
+  informant = models.TextField(verbose_name='OF: informant') #T
+
+  location = models.TextField(verbose_name='Location') #U
+
+
+  recording_device = models.CharField(max_length=60, blank=True) #V
   to_dialect = models.ForeignKey('Dialect', blank=True, null=True,
                                       verbose_name='Dialect')
   to_speakers = models.ManyToManyField(Speaker, blank=True,
-                                      verbose_name='Speakers')
+                                      verbose_name='Speakers') #THESE TO BE CONSTRUCTED FROM INF1..INF4
   to_interviewers = models.ManyToManyField(Interviewer, blank=True,
-                                      verbose_name='Interviewers')
-  notes = models.TextField(blank=True)
+                                      verbose_name='Interviewers') #not used right now
   
+##  def clean(self):
+##    # Don't allow draft entries to have a pub_date.
+##    date_and_letter = '_'.join(self.string_id.split('_')[:2])
+##
+##    if list(similar_id_queryset)!=[]:
+##      raise ValidationError({'string_id': _('Recording with this ID already exists.')})
+
   def __str__(self):
-    return os.path.basename(self.data.name)[:-4]
+    return self.string_id
 
   def participants(self):
     from corpora.elan_tools import ElanObject
@@ -132,6 +158,12 @@ class Recording(models.Model):
   class Meta:
     verbose_name = 'Recording'
     verbose_name_plural = 'Recordings'
+
+##def recording_unique_queryset(date_and_letter, ):
+##    similar_id_queryset = Recording.objects.filter(string_id__contains=date_and_letter)
+##    if self.pk:
+##        similar_id_queryset = similar_id_queryset.exclude(pk=self.pk)
+##    return similar_id_queryset
 
 class Corpus(models.Model):
   

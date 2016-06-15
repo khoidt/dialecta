@@ -34,13 +34,17 @@ class RecordingAdmin(VersionAdmin):
 
   editor_template = 'editor.html'
   trainer_template = 'trainer.html'
-  fields = (('recording_date', 'recording_time', 'recording_place'),
-            ('data', 'audio'),
-            'recording_device',
-            'audio_data', 'participants', 'to_speakers', 'to_interviewers', 'to_dialect',
-            ('string_id'),
-##          ('string_id', 'rename_files_accordingly'),
-            'notes',
+  fields = (
+            ('string_id'),('audio','data'),
+            ('recording_date', 'recording_time', 'recording_place'),
+            ('audio_data', 'participants'), ('to_speakers', 'to_interviewers'),
+            ('title'),
+            ('topics'),
+            ('comments'),
+            ('metacomment1'),
+            ('metacomment2', 'metacomment3'),
+            ('to_dialect',
+            'recording_device'),
             )
   readonly_fields = ('audio_data','participants',)
 
@@ -61,16 +65,46 @@ class RecordingAdmin(VersionAdmin):
                ]
     return my_urls + urls
 
-  @transaction.atomic
-  def get_valid_string_id(self, request):
-    
-    date_str = request.POST['request_data[date]']
-    speaker_str = request.POST['request_data[speaker]']
-    #obj = File.objects.get(id = request.path.split('/')[-3])
-    #print(File.objects.all().filter(string_id__contains=date_str), obj)
-    print(request.path)
-    return '%s%s_%s' %(date_str, '', speaker_str)
-
+##  def get_model_object(self, url_pk):
+##
+##    try:
+##      int(url_pk)
+##      return Recording.objects.get(pk=url_pk)
+##    except ValueError:
+##      return None
+##
+##  def get_alphabetic_number(self, n):
+##
+##    abc_lst = list(map(chr, range(97, 123)))
+##    if n < len(abc_lst): # i.e. n < 26
+##      return abc_lst[n]
+##    else: #will work only when the number is between 26 and 676
+##      n1 = int(n/26)
+##      n2 = int((n/26 - n1)*26)
+##      return (abc_lst[n1]+abc_lst[n2])
+##
+##  @transaction.atomic
+##  def get_valid_string_id(self, request, index=''):
+##
+##    model_obj = self.get_model_object(request.POST['modelID'])
+##    date_str = request.POST['request_data[date]']
+##    speaker_str = request.POST['request_data[speaker]']
+##    if index == '':
+##      index = 0
+##
+##    similar_id_queryset = Recording.objects.all().filter(string_id__contains=date_str)
+##    if model_obj!=None and index==0:
+##      similar_id_queryset = similar_id_queryset.exclude(pk=model_obj.pk)
+##      abc_number = model_obj.string_id.split('_')[1]
+##    else:
+##      abc_number = self.get_alphabetic_number(len(similar_id_queryset)+index)
+##      
+##    if not list(similar_id_queryset.filter(string_id__contains='_%s_' %(abc_number))):
+##      return '%s_%s_%s' %(date_str, abc_number, speaker_str)
+##    else:
+##      print(list(similar_id_queryset.filter(string_id__contains='_%s_' %(abc_number))))
+##      self.get_valid_string_id(request, index+1)
+  
   @transaction.atomic
   def edit(self, request):
 
@@ -109,7 +143,7 @@ class RecordingAdmin(VersionAdmin):
 
   @csrf_exempt
   def ajax_dispatcher(self, request):
-      print(request.POST)
+      #print(request.POST)
       response = {}
       if request.POST == {} or self.processing_request == True:
         return HttpResponse(json.dumps(response))
@@ -127,8 +161,8 @@ class RecordingAdmin(VersionAdmin):
         response['result'] = self.standartizator.get_annotation_options_list(request.POST['request_data[nrm]'])
       elif request.POST['request_type'] == 'save_elan_req':
         self.elan_converter.save_html_to_elan(request.POST['request_data[html]'])
-      elif request.POST['request_type'] == 'string_id_update':
-        response['result'] = self.get_valid_string_id(request)
+##      elif request.POST['request_type'] == 'string_id_update':
+##        response['result'] = self.get_valid_string_id(request)
       self.processing_request = False
       return HttpResponse(json.dumps(response))
 

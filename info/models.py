@@ -10,13 +10,6 @@ SEX_CHOICES = (
     ('f', 'Female'),
 )
 
-EDUCATION_CHOICES = (
-	('No', 'No education'),
-        ('PS', 'Primary school education'),
-        ('SS', 'Secondary school education'),
-        ('PE', 'Professional education'),
-        ('HE', 'High education'),
-)
 
 class Location(models.Model):
   
@@ -40,24 +33,36 @@ class Interviewer(models.Model):
   
 
 class Speaker(models.Model):
+  string_id = models.CharField(max_length=30,verbose_name='Speaker ID')#A
 
-  last_name = models.CharField(max_length=15,)
-  first_name = models.CharField(max_length=15,)
+  
+  last_name = models.CharField(max_length=15,)#E
+  first_name = models.CharField(max_length=15,)#C
   patronimic_name = models.CharField(max_length=20,
                                      blank=True,
-                                     )
+                                     )#D
   other_names = models.CharField(max_length=40,
                                      blank=True,
                                      )
-  sex = models.CharField(max_length=1, choices=SEX_CHOICES,)
-  year_of_birth = models.IntegerField(null=True,)
+  sex = models.CharField(max_length=1, choices=SEX_CHOICES,)#F - change ж to f, м to m
+  year_of_birth = models.IntegerField(null=True,)#D
   year_of_death = models.IntegerField(blank=True,null=True,)
   locations = models.ManyToManyField('Location',
                                      through='LocationRelation',
                                      )
+  #ONLY for import from google docs
+  pob = models.CharField(max_length=200,blank=True,verbose_name='Old Field: Place of Birth')#H
+  por = models.CharField(max_length=200,blank=True,verbose_name='Old Field: Residence')#I
+  pofr = models.CharField(max_length=200,blank=True,verbose_name='Old Field: Former Residence')#J
+  mob = models.CharField(max_length=80,blank=True,verbose_name='Old Field: Mobility')#K
+  
+
   mobility = models.IntegerField(blank=True,null=True,)
-  education = models.ForeignKey('EducationType')
-  education_text = models.TextField(blank=True,)
+  education = models.ForeignKey('EducationType',blank=True,null=True)
+
+  #used during import: 
+  education_text = models.TextField(blank=True,)#M
+
   relations = models.ManyToManyField('self',
                                      through='PersonalRelation',
                                      symmetrical=False,
@@ -66,9 +71,18 @@ class Speaker(models.Model):
   languages = models.ManyToManyField('Language',
                                      through='LanguageRelation',
                                      )
-  profession = models.CharField(max_length=30,blank=True)
+  #used during import: 
+  profession = models.CharField(max_length=200,blank=True)#L
+
+  #ONLY for import from google docs
+  relatives = models.CharField(max_length=200,verbose_name='Old Field: Relatives')#O
+  parents = models.CharField(max_length=200,verbose_name='Old Field: Parents')#R
+  
+
   photo = models.ImageField(blank=True,)
-  details = models.TextField(blank=True,)
+
+  #used during import for Примечания
+  details = models.TextField(blank=True,)#P
 
   def __str__(self):
 
