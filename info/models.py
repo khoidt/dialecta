@@ -79,7 +79,7 @@ class Speaker(models.Model):
   parents = models.CharField(max_length=200,verbose_name='Old Field: Parents')#R
   
 
-  photo = models.ImageField(blank=True,)
+  photo = models.ImageField(blank=True,null=True,)
 
   #used during import for Примечания
   details = models.TextField(blank=True,)#P
