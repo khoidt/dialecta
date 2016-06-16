@@ -156,7 +156,19 @@ class Recording(models.Model):
     return 'None'
 
   def file_check(self):
-        pass
+
+    print(self.string_id)
+      
+    if self.string_id!=None:
+        matchig_files_lst = []
+        for root, dirs, files in os.walk(settings.MEDIA_ROOT):
+            print(root, dirs, files)
+            for file in files:
+                if file.startswith(self.string_id+'.'):
+                    matchig_files_lst.append(file)
+                    #print(os.path.join(root, file))
+    return ', '.join(matchig_files_lst)
+
 
   class Meta:
     verbose_name = 'Recording'
