@@ -8,7 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 SEX_CHOICES = (
     ('m', 'Male'),
     ('f', 'Female'),
-	('u', 'Unspecified'),
+    ('u', 'Unspecified'),
 )
 
 class Location(models.Model):
@@ -61,7 +61,7 @@ class Speaker(models.Model):
   education = models.ForeignKey('EducationType',blank=True,null=True)
 
   #used during import: 
-  education_text = models.TextField(blank=True,)#M
+  education_text = models.TextField(blank=True,verbose_name='Education details')#M
 
   relations = models.ManyToManyField('self',
                                      through='PersonalRelation',

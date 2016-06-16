@@ -46,7 +46,10 @@ class SpeakerAdmin(VersionAdmin):
   inlines = (PersonalRelationInline,LocationRelationInline,LanguageRelationInline)
   fieldsets = (
     #('Photo', {'fields':(('photo_preview', 'photo')),}),
-    ('Basic info', {'fields':(('string_id','sex','year_of_birth'),('last_name','first_name','patronimic_name', 'other_names'),('pob','por','pofr')),}),
+    ('Basic info', {'fields':(('string_id','sex','year_of_birth'),('last_name','first_name'),
+                              ('patronimic_name', 'other_names'),
+                              ('pob','por','pofr'),
+                              ),}),
     ('Education and profession', {'fields':(('education','education_text'),('profession','mobility')),}),
     ('Geography of Life', {'classes': ('placeholder locationrelation_set-group',), 'fields':(),}),
     ('Other', {'fields':('details',),}),
