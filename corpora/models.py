@@ -93,7 +93,7 @@ class Recording(models.Model):
   
   #ONLY for import from google docs: "participants", "informant"
   participants_field = models.TextField(verbose_name='OF: participants',blank=True) #I
-  informant = models.TextField(verbose_name='OF: informant') #T
+  informant = models.TextField(verbose_name='OF: informant',blank=True) #T
 
   location = models.TextField(verbose_name='Location') #U
 

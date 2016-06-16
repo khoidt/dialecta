@@ -32,6 +32,8 @@ from reversion.admin import VersionAdmin
 @admin.register(Recording)
 class RecordingAdmin(VersionAdmin):
 
+  list_display = ('string_id', 'audio','speakerlist', 'title')
+
   editor_template = 'editor.html'
   trainer_template = 'trainer.html'
   fields = (
@@ -54,6 +56,9 @@ class RecordingAdmin(VersionAdmin):
   class Media:
     js = ("js/ustie_id.js",)
 
+  def speakerlist(self, obj):
+    return ', '.join([a.string_id for a in obj.to_speakers.all()])
+	
   def get_urls(self):
 
     self.processing_request = False

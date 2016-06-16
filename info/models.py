@@ -8,8 +8,8 @@ from django.core.exceptions import ObjectDoesNotExist
 SEX_CHOICES = (
     ('m', 'Male'),
     ('f', 'Female'),
+	('u', 'Unspecified'),
 )
-
 
 class Location(models.Model):
   
@@ -33,7 +33,7 @@ class Interviewer(models.Model):
   
 
 class Speaker(models.Model):
-  string_id = models.CharField(max_length=30,verbose_name='Speaker ID')#A
+  string_id = models.CharField(max_length=10,verbose_name='Speaker ID')#A
 
   
   last_name = models.CharField(max_length=15,)#E
@@ -90,7 +90,7 @@ class Speaker(models.Model):
     if self.patronimic_name !='':
       patr = ' '+self.patronimic_name
 
-    return '%s, %s%s %s' %(self.last_name, self.first_name, patr, self.year_of_birth)
+    return '%s: %s, %s%s %s' %(self.string_id, self.last_name, self.first_name, patr, self.year_of_birth)
 
   def photo_preview(self):
     if self.photo.url:
@@ -112,7 +112,6 @@ class RelationType(models.Model):
     if self.assymetric_relation != None:
       return '%s <> %s' %(self.name, self.assymetric_relation.name)
     return '%s <> %s' %(self.name, self.name)
-
 
 class EducationType(models.Model):
   
@@ -231,7 +230,7 @@ class LocationRelation(models.Model):
   details = models.TextField(blank=True,null=True)
 
   class Meta:
-    verbose_name_plural = 'Va. Geography of Life'
+    verbose_name_plural = 'Geography of Life'
 
 class LanguageRelation(models.Model):
 
@@ -241,7 +240,7 @@ class LanguageRelation(models.Model):
   literate = models.BooleanField()
 
   class Meta:
-    verbose_name_plural = 'VI. Linguistic Biography'
+    verbose_name_plural = 'Linguistic Biography'
 
 class Language(models.Model):
   

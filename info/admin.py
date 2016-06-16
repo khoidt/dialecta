@@ -8,6 +8,7 @@ class PersonalRelationInline(admin.TabularInline):
   model = PersonalRelation
   extra = 0
   fk_name = 'from_speaker'
+  verbose_name_plural = 'Relations to other speakers'
   
   def formfield_for_foreignkey(self, db_field, request=None, **kwargs):
 
@@ -27,13 +28,15 @@ class LocationRelationInline(admin.TabularInline):
 
     model = LocationRelation
     extra = 1
-    verbose_name = 'location'
+    verbose_name = 'Location'
+    verbose_name_plural = 'Geography of Life'
 
 class LanguageRelationInline(admin.TabularInline):
 
     model = LanguageRelation
     extra = 1
     verbose_name = 'Language'
+    verbose_name_plural = 'Linguistic Repertoire'
 
 @admin.register(Speaker)
 class SpeakerAdmin(VersionAdmin):
