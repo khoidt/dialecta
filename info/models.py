@@ -30,9 +30,9 @@ class Interviewer(models.Model):
   year_of_enrollment = models.IntegerField(null=True,)
   affiliation = models.CharField(max_length=100,blank=True,)
   role = models.CharField(max_length=40,)
-  
 
 class Speaker(models.Model):
+  
   string_id = models.CharField(max_length=10,verbose_name='Speaker ID')#A
 
   

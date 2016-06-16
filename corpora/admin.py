@@ -40,6 +40,7 @@ class RecordingAdmin(VersionAdmin):
             ('string_id'),('audio','data'),
             ('recording_date', 'recording_time', 'recording_place'),
             ('audio_data', 'participants'), ('to_speakers', 'to_interviewers'),
+            ('speakerlist'),
             ('title'),
             ('topics'),
             ('comments'),
@@ -48,7 +49,7 @@ class RecordingAdmin(VersionAdmin):
             ('to_dialect',
             'recording_device'),
             )
-  readonly_fields = ('audio_data','participants',)
+  readonly_fields = ('audio_data','participants','speakerlist',)
 
 ##  form = RenameCheckboxAdminForm
   save_as=True

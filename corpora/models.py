@@ -155,6 +155,9 @@ class Recording(models.Model):
         pass
     return 'None'
 
+  def file_check(self):
+        pass
+
   class Meta:
     verbose_name = 'Recording'
     verbose_name_plural = 'Recordings'
