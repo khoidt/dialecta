@@ -42,6 +42,7 @@ class LanguageRelationInline(admin.TabularInline):
 class SpeakerAdmin(VersionAdmin):
 
   list_display = ('last_name', 'first_name','patronimic_name', 'sex', 'year_of_birth', 'education')
+  search_fields = ('last_name', 'first_name')
 
   inlines = (PersonalRelationInline,LocationRelationInline,LanguageRelationInline)
   fieldsets = (
