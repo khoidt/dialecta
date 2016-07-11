@@ -4,6 +4,7 @@
 from django.db import models
 from geoposition.fields import GeopositionField
 from django.core.exceptions import ObjectDoesNotExist
+from morphology.models import *
 
 SEX_CHOICES = (
     ('m', 'Male'),
@@ -68,7 +69,7 @@ class Speaker(models.Model):
                                      symmetrical=False,
                                      through_fields=('from_speaker', 'to_speaker'),
                                      )
-  languages = models.ManyToManyField('Language',
+  languages = models.ManyToManyField(Language,
                                      through='LanguageRelation',
                                      )
   #used during import: 
@@ -97,6 +98,12 @@ class Speaker(models.Model):
       return '<img src="%s" style="height:100px; width:100px;"/>' %(self.photo.url)
     return ''
   photo_preview.allow_tags = True
+
+  def place_of_birth(self):
+    try:
+      return self.locations.all().filter(locationrelation__place_of_birth=True)[0].name
+    except IndexError:
+      return ''
 
   def get_relations(self):
     return Speaker.objects.select_related('relations')
@@ -235,27 +242,9 @@ class LocationRelation(models.Model):
 class LanguageRelation(models.Model):
 
   to_speaker = models.ForeignKey('Speaker')
-  to_language = models.ForeignKey('Language', verbose_name = 'Language')
+  to_language = models.ForeignKey(Language, verbose_name = 'Language')
   native_speaker = models.BooleanField()
   literate = models.BooleanField()
 
   class Meta:
     verbose_name_plural = 'Linguistic Biography'
-
-class Language(models.Model):
-  
-  name = models.CharField(max_length=50)
-  abbreviation = models.CharField(max_length=5)
-
-  def __str__(self):
-    return self.abbreviation
-
-class Dialect(models.Model):
-  
-  name = models.CharField(max_length=50)
-  abbreviation = models.CharField(max_length=5)
-  to_language = models.ForeignKey('Language')
-  description = models.TextField(blank=True)
-
-  def __str__(self):
-    return self.abbreviation

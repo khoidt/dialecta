@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pymorphy2, re, codecs, os, sys, json
+import pymorphy2, re, codecs, os, sys, json, difflib
 from pympi import Eaf, Elan
 from lxml import etree
 from urllib.request import urlopen, URLError
@@ -10,6 +10,8 @@ from decimal import *
 from django.conf import settings
 from django.conf.urls.static import static
 from corpora.models import *
+
+import enchant
 
 
 class glyph_equation:
@@ -50,16 +52,14 @@ class glyph_equation:
         extras += 100 * times
       if _context_dict['a1'] == context_dict['a1'] and _context_dict['b1'] == context_dict['b1']:
         extras += 50 * times
-      if _context_dict['a1'] == context_dict['a1'] and _context_dict['b1'] == context_dict['b1']:
-        extras += 10 * times
       if _context_dict['a2'] == context_dict['a2'] and _context_dict['a1'] == context_dict['a1']:
         extras += 10 * times
       if _context_dict['b2'] == context_dict['b2'] and _context_dict['b1'] == context_dict['b1']:
         extras += 10 * times
       if _context_dict['b1'] == context_dict['b1']:
-        points += 5 * times
+        points += 2 * times
       if _context_dict['a1'] == context_dict['a1']:
-        points += 5 * times
+        points += 2 * times
       if _context_dict['b2'] == context_dict['b2']:
         points += 1 * times
       if _context_dict['a2'] == context_dict['a2']:
@@ -120,6 +120,7 @@ class orthographic_data:
     i = 0
     while i < len(trans):
       match_lst = self.match(trans[i], self.get_context(trans, i))
+      #print(trans, match_lst)
       if match_lst == None:
         return []
       var_lst = self.update_var_lst(var_lst, match_lst)
@@ -142,10 +143,10 @@ class standartizator(orthographic_data):
   def __init__(self, dialect=''):
 
     self.dialect = dialect
-    #print(dialect)
-    self.model = NormalizationModel.objects.get(to_dialect = self.dialect)    
+    self.model = NormalizationModel.objects.get(to_dialect = self.dialect)
     self.morph_rus = pymorphy2.MorphAnalyzer()
     self.annotation_menu = annotation_menu_from_xml("grammemes_pymorphy2.xml")
+    self.be_spellchecker = enchant.Dict("be_BY")
 
   def update_model(self, examples_dict, exceptions_lst):
 
@@ -157,6 +158,15 @@ class standartizator(orthographic_data):
     self.model.exceptions = ';'.join(exceptions_lst)
     self.model.save()
 
+  def spellchecker_hub(self, token):
+
+    result_lst = [token]
+    if self.dialect.__str__() == 'MP':
+      result_lst = self.belarusian_spellchecker(token)
+    elif self.dialect.__str__() == 'RUSP':
+      result_lst = self.yandex_spellchecker(token)
+    return result_lst
+
   def yandex_spellchecker(self, token):
 
     url = 'http://speller.yandex.net/services/spellservice/checkText?text='+quote(token)
@@ -164,6 +174,13 @@ class standartizator(orthographic_data):
     result_xml = etree.fromstring(result)
     if len(result_xml.xpath('error')) > 0:
       return result_xml.xpath('error/s/text()')
+    else:
+      return [token]
+
+  def belarusian_spellchecker(self, token):
+
+    if self.be_spellchecker.check(token)==False:
+      return self.be_spellchecker.suggest(token)
     else:
       return [token]
 
@@ -177,6 +194,9 @@ class standartizator(orthographic_data):
     
     self.equations_lst = []
     self.uneq_lst = []
+
+    self.longer_lst = []
+    self.shorter_lst = []
 
     self.check_and_learn_option = False
     self.learning_report_option = True
@@ -201,7 +221,17 @@ class standartizator(orthographic_data):
     self.exceptions_lst = self.model.exceptions.split(';')
     for example in self.examples_lst:
       self.check_and_learn(example[0], example[1])
+    self.process_longer_trans_exx()
+    #self.process_shorter_trans_exx()
+    print(self.longer_lst, len(self.longer_lst))
+    #print(self.shorter_lst, len(self.shorter_lst))
     self.print_learning_report()
+
+  def preprocess_trans(self, trans):
+    trans = trans.lower()
+    for char in ["'", 'a', 'e', 'i', 'u']:
+      trans = re.sub(char+'+', char, trans)
+    return trans
 
   def get_examples_dict(self):
     examples_dict = {}
@@ -228,12 +258,16 @@ class standartizator(orthographic_data):
     examples_lst = []
     for line in self.model.examples.splitlines():
       line = line.rstrip()
+
+      #regular: token - language
       if 'sep=' not in line and len(line.split(';')) == 2:
         trans, standz = line.split(';')
         #sys.stdout.buffer.write(line.encode('utf-8'))
         if len(trans) != 0 and len(standz) != 0 and [trans.lower(), standz.lower()] not in examples_lst:
           examples_lst.append([trans.lower(), standz.lower()])
-      if 'sep=' not in line and len(line.split(';')) == 3:
+
+      #bilingual: token - language1 - language2
+      if 'sep=' not in line and len(line.split(';')) == 3: 
         trans, standz, additional = line.split(';')
         if len(trans) != 0 and len(standz) != 0 and len(additional) != 0 and [trans.lower(), standz.lower(), additional.lower()] not in examples_lst:
           examples_lst.append([trans.lower(), standz.lower(), additional.lower()])
@@ -272,7 +306,7 @@ class standartizator(orthographic_data):
       
   def check_and_learn(self, trans, standz):
     
-    trans = trans.lower()
+    trans = self.preprocess_trans(trans)
     standz = standz.lower()
     self.examples_counter += 1
     
@@ -293,7 +327,7 @@ class standartizator(orthographic_data):
   def run_vars_through_spellchecker(self, trans, standz, vars_lst):
 
     if len(vars_lst) > 0:
-      spell_check_lst = self.yandex_spellchecker(vars_lst[0])
+      spell_check_lst = self.spellchecker_hub(vars_lst[0])
       if self.spell_check_lst_limit != None:
         spell_check_lst = spell_check_lst[:self.spell_check_lst_limit-1]
       if standz in spell_check_lst:
@@ -319,9 +353,9 @@ class standartizator(orthographic_data):
     elif len(trans) == len(standz):
       self.add_same_len(trans, standz)
     elif len(trans) > len(standz):
-      self.add_longer_trans(trans, standz)
+      self.longer_lst.append((trans, standz))
     elif len(trans) < len(standz):
-      self.add_shorter_trans(trans, standz)
+      self.shorter_lst.append((trans, standz))
   
   def add_same_len(self, trans, standz):
     
@@ -329,37 +363,51 @@ class standartizator(orthographic_data):
     while i < len(trans):
       self.equate(trans[i], standz[i], trans, i)
       i += 1
-      
-  def add_longer_trans(self, trans, standz):
 
-    self.uneq_counter += 1
-    self.t_s_diff += len(trans) - len(standz)
-    i = 0
-    gap = 0
-    while i < len(trans):
-      glyph = trans[i]
-      if i+gap+1 > len(standz): #EXRTRA CHAR IN TRANS AUSLAUT
-        self.equate(trans[i], '', trans, i)
-        break
-      else:
-        match = self.match(glyph, self.get_context(trans, i))
-        standz_in_match = False
-        if match != None:
-          standz_in_match = standz[i+gap] in map(lambda x: x[0], match)
-          if standz_in_match != False:
-            self.equate(trans[i], standz[i+gap], trans, i)
-          else:
-            if '' in map(lambda x: x[0], match): #EXTRA CHAR IN TRANS
-              self.equate(trans[i], '', trans, i)
-              i += 1
-              gap -= 1
-            else:
-              pass #do something?
-        else:
-          print('no match:', trans[i], 'passing')
-          pass
-        i += 1
-        
+  def process_longer_trans_exx(self):
+
+    for trans, standz in self.longer_lst:
+      index_dict = {}
+      n = 0
+      previous_standz_char = ''
+      while n < len(standz):
+        i = n
+        while i < len(trans):
+          occur_lst = list(map(lambda item: item[0], self.match(trans[i], self.get_context(trans, i))))
+          if standz[n] in occur_lst:
+            try:
+              if previous_standz_char!=standz[n]:
+                index_dict[n] = i
+                previous_standz_char = standz[n]
+                break
+            except IndexError:
+              index_dict[n] = i
+              previous_standz_char = standz[n]
+              break
+          i+=1
+        n+=1
+      self.add_longer_trans_matches(trans, standz, index_dict)
+
+  def add_longer_trans_matches(self, trans, standz, index_dict):
+
+    if len(standz) > len(index_dict):
+      covered_standz_pos_lst = sorted(index_dict.keys())
+      covered_trans_pos_lst = sorted(list(map(lambda item: index_dict[item], index_dict.keys())))
+      
+      missing_standz_pos_lst = sorted(list(set(range(len(standz))) - set(covered_standz_pos_lst)))
+      missing_trans_pos_lst = sorted(list(set(range(len(trans))) - set(covered_trans_pos_lst)))
+
+      #missing matches:
+      for n in missing_standz_pos_lst:
+        for i in missing_trans_pos_lst:
+          if i >= n:
+            index_dict[n] = i
+            break
+    for n in index_dict.keys():
+      i = index_dict[n]
+      self.equate(trans[i], standz[n], trans, i)
+      n+=1
+
   def add_shorter_trans(self, trans, standz):
     #self.uneq_counter += 1
     #self.t_s_diff += len(trans) - len(standz)
@@ -377,7 +425,7 @@ class standartizator(orthographic_data):
     results_dict = {}
     for var in vars_lst:
       try:
-        temp_lst = self.yandex_spellchecker(var[0])
+        temp_lst = self.spellchecker_hub(var[0])
         if temp_lst == []:
           pass
         elif temp_lst[0] == var[0]: #IF CORRECT SPELLING
@@ -399,11 +447,12 @@ class standartizator(orthographic_data):
     return vars_lst
   
   def generate_dict_for_translit_token(self, token):
-    
+
+    token = self.preprocess_trans(token)
     vars_lst = self.generate_variants(token)[:20]
     if self.spellchecker_option == True:
       vars_lst = self.spellchecker_filter(vars_lst)
-      #print(vars_lst)
+    print(token, vars_lst)
     return vars_lst
 
   def get_annotation_options_list(self, token):
@@ -414,6 +463,14 @@ class standartizator(orthographic_data):
         tag = self.annotation_menu.override_abbreviations(str(annot.tag))
         result_lst.append([annot.normal_form, tag, annot.score])
     return result_lst
+
+  def auto_annotation(self, token):
+    
+    try:
+      normalization = self.generate_dict_for_translit_token(token)[0][0]
+      return (token, normalization, self.get_annotation_options_list(normalization)[0])
+    except IndexError:
+      return None    
 
 '''
 def pack_tags_to_dict(tags_lst, p):
@@ -542,15 +599,15 @@ class elan_to_html:
     for annot_data in self.elan_obj.annot_data_lst:
       tier_name = annot_data[3]
       tier_obj = self.elan_obj.get_tier_obj_by_name(tier_name)
-
-      normz_tokens_dict = self.get_additional_tags_dict(tier_name+'_standartization', annot_data[0], annot_data[1])
-      annot_tokens_dict = self.get_additional_tags_dict(tier_name+'_annotation', annot_data[0], annot_data[1])
+      if tier_obj.attributes['TIER_ID']!='comment':
+        normz_tokens_dict = self.get_additional_tags_dict(tier_name+'_standartization', annot_data[0], annot_data[1])
+        annot_tokens_dict = self.get_additional_tags_dict(tier_name+'_annotation', annot_data[0], annot_data[1])
       
-      [participant, tier_status] = self.get_participant_tag_and_status(tier_obj)
-      audio_div = self.get_audio_annot_div(annot_data[0], annot_data[1])
-      annot_div = self.get_annot_div(tier_name, participant, annot_data[2], normz_tokens_dict, annot_tokens_dict)
-      html += '<div class="annot_wrapper %s">%s%s</div>' %(tier_status, audio_div, annot_div)
-      i += 1
+        [participant, tier_status] = self.get_participant_tag_and_status(tier_obj)
+        audio_div = self.get_audio_annot_div(annot_data[0], annot_data[1])
+        annot_div = self.get_annot_div(tier_name, participant, annot_data[2], normz_tokens_dict, annot_tokens_dict)
+        html += '<div class="annot_wrapper %s">%s%s</div>' %(tier_status, audio_div, annot_div)
+        i += 1
     self.html = '<div class="eaf_display">%s</div>' %(html)
 
   def get_additional_tags_dict(self, tier_name, start, end):
@@ -573,7 +630,7 @@ class elan_to_html:
     if tier_obj != None:
       participant = tier_obj.attributes['PARTICIPANT'].title()
       if participant not in self.participants_dict.keys():
-        self.participants_dict[participant] = '. '.join([namepart[0] for namepart in participant.split(' ')])+'.'
+          self.participants_dict[participant] = '. '.join([namepart[0] for namepart in filter(None, participant.split(' '))])+'.'
       else:
         participant = self.participants_dict[participant]
       if '_i_' in tier_obj.attributes['TIER_ID']:

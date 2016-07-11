@@ -6,7 +6,9 @@ from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 import os, sndhdr
 from info.models import *
+from morphology.models import *
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 
 
 class OverwriteStorage(FileSystemStorage):
@@ -20,56 +22,6 @@ class OverwriteStorage(FileSystemStorage):
             os.remove(os.path.join(settings.MEDIA_ROOT, name))
         return name
 
-class Language(models.Model):
-  
-  name = models.CharField(max_length=50)
-  abbreviation = models.CharField(max_length=5)
-
-  def __str__(self):
-    return self.abbreviation
-
-class Dialect(models.Model):
-  
-  name = models.CharField(max_length=50)
-  abbreviation = models.CharField(max_length=5)
-  to_language = models.ForeignKey('Language')
-  description = models.TextField(blank=True)
-
-  def __str__(self):
-    return self.abbreviation
-
-class Lemma(models.Model):
-
-  value = models.CharField(max_length=30)
-  POS = models.CharField(max_length=10)
-  to_language = models.ForeignKey('Language')
-  
-  class Meta:
-    verbose_name_plural = 'Lemmata'
-
-  def __str__(self):
-    return self.value
-
-class Form(models.Model):
-
-  value = models.CharField(max_length=30)
-  to_lemma = models.ForeignKey(Lemma, verbose_name='to lemma(ta)')
-  annotation = models.CharField(max_length=30)
-  
-  def __str__(self):
-    return self.value
-
-class TokenToForm(models.Model):
-
-  order_id = models.IntegerField()
-  to_form = models.ForeignKey('Form')
-  to_token = models.ForeignKey('Token')
-
-class Token(models.Model):
-
-  transcription = models.CharField(max_length=50)
-  to_forms = models.ManyToManyField('Form', through='TokenToForm')
-
 class Recording(models.Model):
   
   #for import from google docs: filename WITHOUT mp3 or wav
@@ -79,7 +31,7 @@ class Recording(models.Model):
   recording_place = models.ForeignKey(Location, blank=True, null=True)
 
   #should be changed to "transcription"
-  data = models.FileField(storage=OverwriteStorage(),blank=True,null=True, verbose_name='Transciption') #look into directory!
+  data = models.FileField(storage=OverwriteStorage(),blank=True,null=True, verbose_name='Transcription') #look into directory!
   audio = models.FileField(storage=OverwriteStorage(), blank=True, null=True) #look into directory!
 
   #ONLY for import from google docs: metacomment1, metacomment2, metacomment3 from the Google docs columns A, B and D
@@ -99,7 +51,7 @@ class Recording(models.Model):
 
 
   recording_device = models.CharField(max_length=60, blank=True) #V
-  to_dialect = models.ForeignKey('Dialect', blank=True, null=True,
+  to_dialect = models.ForeignKey(Dialect, blank=True, null=True,
                                       verbose_name='Dialect')
   to_speakers = models.ManyToManyField(Speaker, blank=True,
                                       verbose_name='Speakers') #THESE TO BE CONSTRUCTED FROM INF1..INF4
@@ -155,10 +107,12 @@ class Recording(models.Model):
         pass
     return 'None'
 
-  def file_check(self):
+  def edit_transcription(self):
+    if self.pk!=None and self.data!=None:
+        return mark_safe('<a href="/admin/corpora/recording/%s/edit" class="grp-button">Edit</a>' %(self.pk))
+    return '(add transcription data and save to enable editing)'
 
-    print(self.string_id)
-      
+  def file_check(self): 
     if self.string_id!=None:
         matchig_files_lst = []
         for root, dirs, files in os.walk(settings.MEDIA_ROOT):
@@ -168,8 +122,7 @@ class Recording(models.Model):
                     matchig_files_lst.append(file)
                     #print(os.path.join(root, file))
     return ', '.join(matchig_files_lst)
-
-
+    
   class Meta:
     verbose_name = 'Recording'
     verbose_name_plural = 'Recordings'
@@ -186,11 +139,4 @@ class Corpus(models.Model):
 
   class Meta:
     verbose_name_plural = 'Corpora'
-
-class NormalizationModel(models.Model):
-
-  to_dialect = models.ForeignKey('Dialect')
-  to_additional_language = models.ForeignKey('Language', blank=True, null=True)
-  examples = models.TextField(blank=True)
-  exceptions = models.TextField(blank=True)
   

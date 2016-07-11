@@ -92,6 +92,10 @@ button#merge_right {
 	padding-top: 10px;
 	padding-bottom: 10px;
 }
+#annotation_controls{
+	position: absolute;
+	bottom: 20px;
+}
 div#eaf_display {
 	float: left;
 }

@@ -39,6 +39,7 @@ class RecordingAdmin(VersionAdmin):
   fields = (
             ('string_id'),
             ('audio','data'),
+            ('edit_transcription'),
             ('recording_date', 'recording_time', 'recording_place'),
             ('file_check'),
             ('audio_data', 'participants'),
@@ -52,7 +53,7 @@ class RecordingAdmin(VersionAdmin):
             ('to_dialect'),
             ('recording_device'),
             )
-  readonly_fields = ('audio_data','participants','speakerlist','file_check',)
+  readonly_fields = ('audio_data','participants','speakerlist','file_check','edit_transcription')
 
 ##  form = RenameCheckboxAdminForm
   save_as=True
@@ -117,16 +118,16 @@ class RecordingAdmin(VersionAdmin):
   @transaction.atomic
   def edit(self, request):
 
-    self.file_obj = get_object_or_404(File, id=request.path.split('/')[-3])
-    self.elan_converter = elan_to_html(self.file_obj)
+    self.recording_obj = get_object_or_404(Recording, id=request.path.split('/')[-3])
+    self.elan_converter = elan_to_html(self.recording_obj)
     
-    self.standartizator = standartizator(self.file_obj.to_dialect)
+    self.standartizator = standartizator(self.recording_obj.to_dialect)
     self.standartizator.start_standartizator()
 
     annot_menu_select, annot_menu_checkboxes = self.elan_converter.build_annotation_menu()
     
     context = {'ctext': self.elan_converter.html,
-               'audio_path': self.file_obj.audio.name,
+               'audio_path': self.recording_obj.audio.name,
                'media': self.media['js'],
                'annot_menu_select' : annot_menu_select,
                'annot_menu_checkboxes' : annot_menu_checkboxes,
@@ -136,14 +137,14 @@ class RecordingAdmin(VersionAdmin):
   @transaction.atomic
   def train(self, request):
 
-    self.file_obj = get_object_or_404(File, id=request.path.split('/')[-3])
-    self.elan_converter = elan_to_html(self.file_obj, 'orth_trainig')
+    self.recording_obj = get_object_or_404(Recording, id=request.path.split('/')[-3])
+    self.elan_converter = elan_to_html(self.recording_obj, 'orth_trainig')
     
-    self.standartizator = standartizator(self.file_obj.to_dialect)
+    self.standartizator = standartizator(self.recording_obj.to_dialect)
     self.standartizator.start_standartizator()
     
     context = {'ctext': self.elan_converter.html,
-               'audio_path': self.file_obj.audio.name,
+               'audio_path': self.recording_obj.audio.name,
                'media': self.media['js'],
                'examples_dict': json.dumps(self.standartizator.examples_dict),
                'exceptions_lst': json.dumps(self.standartizator.exceptions_lst),
@@ -165,7 +166,11 @@ class RecordingAdmin(VersionAdmin):
         response['training_dict'] = self.standartizator.examples_dict
         #response['exceptions_arr'] = self.standartizator.exceptions_lst
       elif request.POST['request_type'] == 'trt_annot_req':
-        response['result'] = self.standartizator.generate_dict_for_translit_token(request.POST['request_data[trt]'])
+        #print(request.POST)
+        if request.POST['request_data[mode]'] == 'manual':
+          response['result'] = self.standartizator.generate_dict_for_translit_token(request.POST['request_data[trt]'])
+        elif request.POST['request_data[mode]'] == 'auto':
+          response['result'] = self.standartizator.auto_annotation(request.POST['request_data[trt]'])
       elif request.POST['request_type'] == 'annot_suggest_req':
         response['result'] = self.standartizator.get_annotation_options_list(request.POST['request_data[nrm]'])
       elif request.POST['request_type'] == 'save_elan_req':
@@ -175,34 +180,8 @@ class RecordingAdmin(VersionAdmin):
       self.processing_request = False
       return HttpResponse(json.dumps(response))
 
-@admin.register(Language)
-class LanguageAdmin(VersionAdmin):
-  pass
-
-@admin.register(Dialect)
-class DialectAdmin(VersionAdmin):
-  pass
-
-@admin.register(Lemma)
-class LemmaAdmin(VersionAdmin):
-  pass
-
-@admin.register(Form)
-class FormAdmin(VersionAdmin):
-  pass
-
-@admin.register(TokenToForm)
-class TokenToFormAdmin(VersionAdmin):
-  pass
-
-@admin.register(Token)
-class TokenAdmin(VersionAdmin):
-  pass
 
 @admin.register(Corpus)
 class CorpusAdmin(VersionAdmin):
   pass
 
-@admin.register(NormalizationModel)
-class NormalizationModelAdmin(VersionAdmin):
-  pass

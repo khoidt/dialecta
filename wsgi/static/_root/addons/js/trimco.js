@@ -25,7 +25,19 @@
 				console.log(result.error_text); // Error to log
 			} else {
 				if (req_type == 'trt_annot_req') {
-					list_normlz_suggestions(result.result)
+					if (req_data['mode'] == 'manual') {
+						list_normlz_suggestions(result.result)
+					}
+					if (req_data['mode'] == 'auto') {
+						//console.log(result.result);
+						if (result.result!=null) {
+							apply_auto_annotation(result.result[0],result.result[1],result.result[2])
+						}
+						else {
+							/* continuing to next token when empty*/
+							activate_trt(nextInDOM('trt', $('trt.focused')));
+						};
+					}
 				}
 				else if (req_type == 'annot_suggest_req') {
 					list_annot_suggestions(result.result)
@@ -33,6 +45,10 @@
 			}
 		}
 	});
+	};
+	
+	function auto_annotation_request(trt_tag) {
+		ajax_request('trt_annot_req', {'trt' : trt_tag.text(), 'mode' : 'auto',});
 	};
 	
 	function wb_annotation_mode () {
@@ -47,15 +63,39 @@
 	
 	function activate_trt(trt_tag) {
 		/* prepering <trt> for (re)suggestion of <nrm> */
-		$('#normalization_suggestions_lst').empty();
-		$('#normalization_input').val('');
-		wb_normlization_mode();
+		var mode = 'manual';
+		if ($('#auto_annotation').is(':checked')) {var mode = 'auto'};
+		
+		if (mode=='manual') {
+			$('#normalization_suggestions_lst').empty();
+			$('#normalization_input').val('');
+			wb_normlization_mode();
+		};
 		$('trt.focused').removeAttr('id');
 		$('trt').removeClass('focused');
 		trt_tag.addClass('focused');
-		//console.log($(this).text());
-		$('#examined_transcript').text(trt_tag.text());
-		ajax_request('trt_annot_req', {'trt' : trt_tag.text(),});
+		if (mode=='manual') {
+			$('#examined_transcript').text(trt_tag.text());
+			ajax_request('trt_annot_req', {'trt' : trt_tag.text(), 'mode' : 'manual',});
+		};
+		if (mode=='auto') {
+			auto_annotation_request(trt_tag) 
+		}
+	};
+	
+	function apply_auto_annotation(token, normalization, annotation) {
+
+		console.log($.now(), token, normalization, annotation);
+		
+		var norm_tag = $('<nrm>'+normalization+'</nrm>');
+		var lemma_tag = $('<lemma>'+annotation[0]+'</lemma>');
+		var morph_tag = $('<morph>'+annotation[1]+'</morph></info>');
+		set_annotation(norm_tag, lemma_tag, morph_tag, 'auto')
+			
+		/* FROM TAG */
+		//var norm_tag = $('<nrm>'+$('#normalization_input').val()+'</nrm>');
+		//var lemma_tag = $('<lemma>'+$('#annotation_suggestions_lst li.selected .lemma_suggestion' ).text()+'</lemma>');
+		//var morph_tag = $('<morph>'+$('#annotation_suggestions_lst li.selected .morph_suggestion' ).text()+'</morph></info>');
 	};
 	
 	function list_normlz_suggestions(suggestions_lst) {
@@ -241,18 +281,9 @@
 	
 	/* ANNOTATION TO DOM: FINAL */
 	
-	function set_annotation () {
+	function set_annotation (norm_tag, lemma_tag, morph_tag, mode) {
 	
 		/* adding normalization, lemma and morphology tags to DOM */
-		
-		/* FROM TAG */
-		//var norm_tag = $('<nrm>'+$('#normalization_input').val()+'</nrm>');
-		//var lemma_tag = $('<lemma>'+$('#annotation_suggestions_lst li.selected .lemma_suggestion' ).text()+'</lemma>');
-		//var morph_tag = $('<morph>'+$('#annotation_suggestions_lst li.selected .morph_suggestion' ).text()+'</morph></info>');
-
-		var norm_tag = $('<nrm>'+$('[title="Form"]').val()+'</nrm>');
-		var lemma_tag = $('<lemma>'+$('[title="Lemma"]').val()+'</lemma>');
-		var morph_tag = $('<morph>'+annot_to_str()+'</morph></info>');
 		
 		$('trt.focused').parent().children('nrm, lemma, morph').remove();
 		
@@ -402,6 +433,7 @@
 		});
 		
 		$('trt').click(function(e) {
+			console.log($('#auto_annotation').is(':checked'));
 			activate_trt($(this));
 		});
 		
@@ -416,7 +448,10 @@
 		
 		$('#add_annotation').click(function(e) {
 			/* confirming choosen annotation */
-			set_annotation();
+			var norm_tag = $('<nrm>'+$('[title="Form"]').val()+'</nrm>');
+			var lemma_tag = $('<lemma>'+$('[title="Lemma"]').val()+'</lemma>');
+			var morph_tag = $('<morph>'+annot_to_str()+'</morph></info>');			
+			set_annotation(norm_tag, lemma_tag, morph_tag, 'manual');
 		});
 	});
 })(django.jQuery);

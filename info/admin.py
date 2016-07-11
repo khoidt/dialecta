@@ -51,12 +51,14 @@ class SpeakerAdmin(VersionAdmin):
                               ('pob','por','pofr'),
                               ),}),
     ('Education and profession', {'fields':(('education','education_text'),('profession','mobility')),}),
+    ('Place of birth', {'fields':('place_of_birth',),}),
     ('Geography of Life', {'classes': ('placeholder locationrelation_set-group',), 'fields':(),}),
     ('Other', {'fields':('details',),}),
     ('Linguistic Biography', {'classes': ('placeholder languagerelation_set-group',), 'fields':(),}),
     ('Relations with other speakers', {'classes': ('placeholder personalrelation_set-group',), 'fields':(),}),
     )
   #readonly_fields = ['photo_preview']
+  readonly_fields = ['place_of_birth']
 
 @admin.register(Location)
 class LocationAdmin(VersionAdmin):
