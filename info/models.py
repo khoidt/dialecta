@@ -107,6 +107,9 @@ class Speaker(models.Model):
 
   def get_relations(self):
     return Speaker.objects.select_related('relations')
+	
+  class Meta:
+    ordering = ['string_id']
 
 class RelationType(models.Model):
   

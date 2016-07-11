@@ -33,6 +33,10 @@ from reversion.admin import VersionAdmin
 class RecordingAdmin(VersionAdmin):
 
   list_display = ('string_id', 'audio','speakerlist', 'title')
+  search_fields = ('to_speakers__string_id',)
+  list_max_show_all = 500
+  list_per_page = 200
+  filter_horizontal = ('to_speakers', 'to_interviewers')
 
   editor_template = 'editor.html'
   trainer_template = 'trainer.html'
@@ -43,7 +47,8 @@ class RecordingAdmin(VersionAdmin):
             ('recording_date', 'recording_time', 'recording_place'),
             ('file_check'),
             ('audio_data', 'participants'),
-            ('to_speakers', 'to_interviewers'),
+            ('to_speakers'),
+            ('to_interviewers'),
             ('speakerlist'),
             ('title'),
             ('topics'),
