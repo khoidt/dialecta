@@ -1,0 +1,273 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls admin_static admin_modify %}
+
+<!-- 
+FIX BREADCRUMPS, SEE BASE.HTML:
+  <li><a href="{% url 'admin:index' %}">{% trans 'Home' %}</a></li>
+-->
+
+{% block extrahead %}{{ block.super }}
+<link rel="stylesheet" type="text/css" href="{% static "css/trimco.css" %}" />
+<link rel="stylesheet" type="text/css" href="{% static "css/font-awesome-4.4.0/css/font-awesome.min.css" %}" />
+<!--<script type="text/javascript" src="{% static "js/trimco.js" %}" ></script>-->
+<style>
+#morph_menu1 {
+	padding-top: 20px;
+	padding-bottom: 20px;
+}
+#morph_menu2 {
+    -webkit-column-count: 3; /* Chrome, Safari, Opera */
+    -moz-column-count: 3; /* Firefox */
+    column-count: 6;
+    -webkit-column-gap: 2px; /* Chrome, Safari, Opera */
+    -moz-column-gap: 2px; /* Firefox */
+    column-gap: 2px;
+	padding-bottom: 20px;
+}
+
+.manualAnnotationContainer.active .manualAnnotation:disabled {
+	color: lightgrey;
+	text-decoration: line-through;
+}
+</style>
+
+<script type="text/javascript">
+(function($) {
+	$(document).ready(function() {
+		
+		update_choices($('#conditions .condition'));
+		
+		$('#add_condition').click(function(e){
+			var condition = $('#preloaded .condition').clone();
+			$('#conditions').append(condition);
+			update_choices(condition);
+		});
+		
+		$('#conditions').on("click", '#remove_condition', function(){
+			$(this).parent().remove();
+		});
+	
+		$('#conditions').on('change', '#model', function() {
+			update_choices($(this).parent());
+		});
+		
+		function update_choices(condition){
+			var value = condition.children('#model').val()
+			if (value!='morphology') {
+				condition.children('#morphology').empty();
+				var choices = condition.children('#choices').empty().attr('style','');
+				$('#preloaded #'+value).clone().children().appendTo(choices);
+			}
+			else {
+				condition.children('#choices').empty().attr('style','display:none;');
+				var morphology = condition.children('#morphology').empty();
+				$('#preloaded #morph_menu').clone().appendTo(morphology).addClass('actual');
+				activate_annotation_form_fields();
+			};
+		};
+		
+		/*******************PROCESS REQUEST ******************/
+		
+		$('#process').click(function() {
+			var req_data = {}
+			req_data = collect_data()
+			ajax_request('lex_query', req_data);
+		});
+		
+		function collect_data(){
+		
+		req_lst = []
+		$.each($("#conditions .condition"), function(i){
+			var rule_operator = $(this).children('#rule_operator').val()
+			var model = $(this).children('#model').val()
+			var operator = $(this).children('#operator').val()
+			var pk =  $(this).children('#choices').val()
+			morph_lst = []
+			if (model=='morphology') {
+				morph_lst = collect_morph_data($(this).find('#morphology'))
+				}
+			req_lst.push({'rule_operator':rule_operator, 'model':model, 'operator':operator, 'pk':pk, 'morph_lst':morph_lst,})
+			});
+		//console.log(req_lst);
+		return req_lst;
+		};
+		
+		function collect_morph_data(morphology){
+			var val_dict = {'true':true, 'false':false}
+			var morph_lst = []
+			$.each(morphology.find('.active select:enabled'), function(i){
+				morph_lst.push($(this).val()+'='+val_dict[$(this).attr('status')])
+			});
+			$.each(morphology.find('.active input:not(:indeterminate)'), function(i){
+				morph_lst.push($(this).attr('value')+'='+$(this).prop('checked'))
+			});
+			return morph_lst;
+		};
+		
+		function ajax_request(req_type, req_data){
+		
+		$.ajax({  //Call ajax function sending the option loaded
+			url: "../ajax/",  //This is the url of the ajax view where you make the search 
+			//contentType: "application/json; charset=utf-8",
+			type: 'POST',
+			data: {'request_type' : req_type, 'request_data' : req_data},
+			timeout: 50000,
+			error: function(x, t, m) {
+				console.log(x, t, m);
+				processing_request = false;
+			},
+			success: function(response) {
+				window.location.replace('download/')
+			}
+			});
+		};
+		
+		/* *************** MORPHOLOGY *************** */
+		
+		$('#conditions').on('change', 'select.manualAnnotation', function() {
+			$(this).parents('#morph_menu').addClass('actual');
+			//console.log($(this).parents('#morph_menu').attr('class'));
+			activate_annotation_form_fields();
+		});
+
+		$('#conditions').on('click', 'button#to_positive', function() {
+			$(this).prev('select').prop('disabled', false);
+			$(this).prev('select').attr('status', 'true');
+			$(this).replaceWith($('<button id="to_negative" style="color:black; ">●</button>'));
+		});
+		
+		$('#conditions').on('click', 'button#to_negative', function() {
+			$(this).prev('select').attr('status', 'false');
+			$(this).replaceWith($('<button id="to_deactivated" style="color:red; ">●</button>'));
+		});
+		
+		$('#conditions').on('click', 'button#to_deactivated', function() {
+			$(this).prev('select').prop('disabled', 'disabled');
+			$(this).replaceWith($('<button id="to_positive" style="color:black; ">○</button>'));
+		});
+		
+		function activate_annotation_form_fields() {
+			activate_annotation_options();
+			activate_annotation_checkboxes();
+			$("#morph_menu.actual").removeAttr('class');
+		};
+			
+		function activate_annotation_options() {
+			/* SELECT OPTIONS */
+			$.each($("#morph_menu.actual select.manualAnnotation"), function(i){
+				var match = false;
+				var option_tag = $(this);
+				if(!option_tag.next("button").length) {
+					option_tag.after('<button id="to_positive" style="color:black; ">○</button>'); //●
+					option_tag.prop('disabled', 'disabled');
+				};
+				$.each(option_tag.data('dep'), function(i, dict){
+					$.each(dict['tags'], function(i, id){
+						if (id=='ALLFORMS') {
+							match = true;
+							return false;
+						};
+						match = $('#morph_menu.actual #'+id).prop('selected');
+						if (match==false){return false};
+					});
+					if (match==true){return false};
+				});
+				update_annotation_field_status(option_tag, match);
+			});
+		};
+		
+		function activate_annotation_checkboxes() {
+			/* CHECKBOXES */
+			$.each($("#morph_menu.actual input.manualAnnotation[type='checkbox']"), function(i){
+				var match = false;
+				$(this).prop("indeterminate", true);
+				$.each($(this).data('dep'), function(i, id){
+					if (id=='ALLFORMS') {
+						match = true;
+						return false;
+					}
+					match = $('#morph_menu.actual #'+id).prop('selected');
+					if (match==true){
+						return false;
+					}
+				});
+				update_annotation_field_status($(this), match);
+			});
+		};
+		
+		function update_annotation_field_status(field, match) {
+			if (match==true) {
+				field.parents('.manualAnnotationContainer').addClass('active');
+			}
+			else {
+				field.parents('.manualAnnotationContainer').removeClass('active');
+			};
+		};
+	});
+})(django.jQuery);
+
+</script>
+
+{{ media }}
+{% endblock %}
+{% block content %}
+
+<div id='preloaded' style='display:none;'>
+{{language|safe}}
+{{dialect|safe}}
+{{speaker|safe}}
+{{location|safe}}
+{{recording|safe}}
+<div id='morph_menu' class='actual'>
+<div id="morph_menu1">{{annot_menu_1|safe}}</div>
+<div id="morph_menu2">{{annot_menu_2|safe}}</div>
+</div>
+
+<div class="condition">
+	<select id='rule_operator'>
+		<option>and</option>
+		<!--<option><option>or</option><-->
+	</select>
+	<select id='model'>
+		<option>morphology</option>
+		<option>language</option>
+		<option>dialect</option>
+		<option>speaker</option>
+		<option>location</option>
+		<option>recording</option>
+	</select>
+	<select id='operator'>
+		<option>is</option>
+		<!--<option>is not</option>-->
+	</select>
+	<select id='choices'></select>
+	<button id="remove_condition" style="margin: 0; color: black;">-</button>
+	<div id='morphology' style="display: block;"></div>
+</div>
+</div>
+
+
+<div id='conditions'>
+<div class="condition">
+	<select id='model'>
+		<option>morphology</option>
+		<option>language</option>
+		<option>dialect</option>
+		<option>speaker</option>
+		<option>location</option>
+		<option>recording</option>
+	</select>
+	<select id='operator'>
+		<option>is</option>
+		<!--<option>is not</option>-->
+	</select>
+	<select id='choices'></select>
+	<div id='morphology' style="display: block;"></div>
+</div>
+</div>
+<button id='add_condition' style="margin: 0; height: 20px; color: black;">+</button>
+
+<!--<input  style="margin-right: 10px;"></input>-->
+<br><br><br><br>
+<button style="margin: 0; height: 20px; color:black;" id="process">Go</button>
+{% endblock %}

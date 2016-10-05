@@ -1,5 +1,6 @@
+Django>=1.9.7
+uWSGI
 DAWG-Python==0.7.2
-Django==1.9.7
 django-appconf==1.0.2
 django-cleanup==0.4.2
 django-geoposition==0.2.2
@@ -11,5 +12,6 @@ lxml==3.6.0
 Pillow==3.2.0
 pymorphy2==0.8
 pymorphy2-dicts==2.4.393442.3710985
-pympi-ling==git+git://github.com/khoidt/pympi
+git+https://github.com/khoidt/pympi
 six==1.10.0
+pyenchant
