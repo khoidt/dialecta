@@ -548,19 +548,19 @@ class ElanObject:
         return tier_obj
     return None
   
-  def add_extra_tags(self, tier_name, start, end, value, typ):
+  def add_extra_tags(self, parent_tier_name, start, end, value, typ):
 
     if typ == 'annotation':
-      tier_name = tier_name+'_annotation'
+      tier_name = parent_tier_name+'_annotation'
       ling = 'tokenz_and_annot'
     elif typ == 'standartization':
-      tier_name = tier_name+'_standartization'
+      tier_name = parent_tier_name+'_standartization'
       ling = 'stndz_clause'
     else:
       return None
       
     if self.get_tier_obj_by_name(tier_name) == None:
-      self.Eaf.add_tier(tier_name, ling=ling, parent=tier_name, locale=None, part=None, ann=None, language=None, tier_dict=None)
+      self.Eaf.add_tier(tier_name, ling=ling, parent=parent_tier_name, locale=None, part=None, ann=None, language=None, tier_dict=None)
       self.load_tiers()
     try:
       self.Eaf.remove_annotation(tier_name, (start+end) / 2, clean=True)
