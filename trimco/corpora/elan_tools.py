@@ -712,10 +712,16 @@ class elan_to_html:
         nrm_lst = token.xpath('nrm/text()')
         lemma_lst = token.xpath('lemma/text()')
         morph_lst = token.xpath('morph/text()')
-        if lemma_lst+morph_lst != []:
-          annot_value_lst.append('%s:%s:%s' %(t_counter, lemma_lst[0], morph_lst[0]))
-        if nrm_lst != []:
-          nrm_value_lst.append('%s:%s' %(t_counter, nrm_lst[0]))
+        try:
+          if lemma_lst+morph_lst != []:
+            annot_value_lst.append('%s:%s:%s' %(t_counter, lemma_lst[0], morph_lst[0]))
+          if nrm_lst != []:
+            nrm_value_lst.append('%s:%s' %(t_counter, nrm_lst[0]))
+        except IndexError:
+          print('Exception while saving. Normalization: %s,' \
+                'Lemmata: %s, Morphology: %s, Counter: %s'
+                % (nrm_lst, lemma_lst, morph_lst, t_counter)
+                )
         t_counter += 1
       if annot_value_lst != []:
         self.elan_obj.add_extra_tags(tier_name, start, end, '|'.join(annot_value_lst), 'annotation')
