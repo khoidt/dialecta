@@ -25,7 +25,7 @@ SECRET_KEY = 'k+3ipyx)=c)_o_%z4_ybnp#7_0#f3bdt#e*gox_^cf7cw#)p+t'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['https://vmd16147.contabo.host:10000/']
 
 
 # Application definition
