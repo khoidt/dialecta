@@ -779,7 +779,7 @@ class annotation_menu_from_xml:
 
   def get_options_for_id(self, id_raw):
     
-    options_str = ''
+    options_str = '<option id="blank"></option>'
     for option_tag in self.tree.xpath("grammeme[contains(@propertyOf,'%s')]" %(id_raw)):
       option_id = self.terms_dict[option_tag.xpath('name/text()')[0]]['newID']
       options_str = "%s<option id='%s'>%s</option>" %(options_str, option_id, option_id)
@@ -824,7 +824,7 @@ class annotation_menu_from_xml:
 
   def override_abbreviations(self, tag):
 
-    tags_lst = re.split('[, -]', tag)
+    tags_lst = [t for t in re.split('[, -]', tag) if t != '']
     i = 0
     while i < len(tags_lst):
       try:
