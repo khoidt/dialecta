@@ -148,16 +148,41 @@ class standartizator(orthographic_data):
 		self.annotation_menu = annotation_menu_from_xml("grammemes_pymorphy2.xml")
 		#self.be_spellchecker = enchant.Dict("be_BY")
 
-	def update_model(self, examples_dict, exceptions_lst):
+	def update_model(self, new_examples_dict, exceptions_lst=[]):
 
 		examples_str = ''
-		for key in examples_dict.keys():
-			if type(examples_dict[key][0]) == str:
-				examples_str += '%s;%s\n' %(key, ';'.join(examples_dict[key]))
-		self.model.examples = examples_str
-		self.model.exceptions = ';'.join(exceptions_lst)
+		self.examples_lst = self.load_examples_from_model()
+		self.examples_dict = self.get_examples_dict()
+		for key in new_examples_dict.keys():
+			if key not in self.examples_dict:
+				examples_str += '%s;%s\n' %(key, new_examples_dict[key])
+				#print(key, new_examples_dict[key])
+		self.model.examples = self.model.examples + examples_str
+		if len(exceptions_lst) > 0:
+			self.model.exceptions = self.model.exceptions + ';'.join(exceptions_lst)
+		print(len(self.model.examples.split('\n')))
 		self.model.save()
-
+		
+		
+	def remove_examples_from_model(self, examples_dict):
+		#doesn't work properly!! rewrite it later 
+		
+		examples_str = ''
+		self.examples_lst = self.load_examples_from_model()
+		self.examples_dict = self.get_examples_dict()
+		#print(self.examples_dict)
+		#print('examples from page:')
+		#print(examples_dict)
+		for key in self.examples_dict.keys():
+			if key not in examples_dict: #or key in examples_dict and self.examples_dict[key] != examples_dict[key]:
+				#print(key, ';'.join(self.examples_dict[key]))
+				examples_str += '%s;%s\n' %(key, ';'.join(self.examples_dict[key]))
+		#print(len(examples_str.split('\n')))
+		self.model.examples = examples_str
+		#print(len(self.model.examples.split('\n')))
+		self.model.save()
+		
+		
 	def spellchecker_hub(self, token):
 
 		result_lst = [token]
@@ -256,14 +281,17 @@ class standartizator(orthographic_data):
 
 		print('loading examples from db')
 		examples_lst = []
+		print(len(self.model.examples.splitlines()))
 		for line in self.model.examples.splitlines():
 			line = line.rstrip()
+			#print(line)
 
 			#regular: token - language
 			if 'sep=' not in line and len(line.split(';')) == 2:
 				trans, standz = line.split(';')
 				#sys.stdout.buffer.write(line.encode('utf-8'))
 				if len(trans) != 0 and len(standz) != 0 and [trans.lower(), standz.lower()] not in examples_lst:
+					#print(trans.lower(), standz.lower())
 					examples_lst.append([trans.lower(), standz.lower()])
 
 			#bilingual: token - language1 - language2
@@ -365,7 +393,7 @@ class standartizator(orthographic_data):
 			i += 1
 
 	def process_longer_trans_exx(self):
-
+		
 		for trans, standz in self.longer_lst:
 			index_dict = {}
 			n = 0
@@ -652,7 +680,7 @@ class elan_to_html:
 
 	def get_audio_link(self):
 		
-		return '<audio id="elan_audio" src="/media/%s" preload></audio>' %(self.audio_file_path)
+		return '<audio id="elan_audio" src="/media/%s" preload=""></audio>' %(self.audio_file_path)
 
 	def prettify_transcript(self, transcript):
 
@@ -696,6 +724,22 @@ class elan_to_html:
 				i += 1
 		return etree.tostring(transcript_obj)[3:-4].decode('utf-8')
 
+	def get_examples_from_page(self): 
+		#returns a dictionary with original tokens (transcriptions; as keys) and their normalizations (as values)
+		
+		new_examples = {}
+		html_obj = etree.fromstring(self.html)
+		for el in html_obj.xpath('//*[contains(@class,"annot_wrapper")]'):
+			for token in el.xpath('*//token'):
+				#print(token.xpath('trt/text()'), token.xpath('nrm/text()'))
+				if len(token.xpath('nrm/text()')) > 0:
+					tkn = token.xpath('trt/text()')[0]
+					nrm = token.xpath('nrm/text()')[0]
+					if tkn not in new_examples:
+						new_examples[tkn.lower()] = nrm.lower()
+						
+		return new_examples
+	
 	def save_html_to_elan(self, html):
 		
 		html_obj = etree.fromstring(html)
